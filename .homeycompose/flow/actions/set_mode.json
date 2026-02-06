@@ -1,0 +1,34 @@
+{
+  "id": "set_mode",
+  "title": {
+    "en": "Set the mode",
+    "es": "Establecer el modo"
+  },
+  "titleFormatted": {
+    "en": "Set the mode to [[mode]]",
+    "es": "Establecer el modo a [[mode]]"
+  },
+  "hint": {
+    "en": "Set the operating mode of the radiator.",
+    "es": "Establece el modo de funcionamiento del radiador."
+  },
+  "args": [
+    {
+      "type": "device",
+      "name": "device",
+      "filter": "driver_id=radiator"
+    },
+    {
+      "type": "dropdown",
+      "name": "mode",
+      "title": { "en": "Mode", "es": "Modo" },
+      "values": [
+        { "id": "off", "label": { "en": "Off", "es": "Apagado" } },
+        { "id": "manual", "label": { "en": "Manual", "es": "Manual" } },
+        { "id": "auto", "label": { "en": "Auto", "es": "Automático" } },
+        { "id": "self_learn", "label": { "en": "Self Learning", "es": "Autoaprendizaje" } },
+        { "id": "presence", "label": { "en": "Presence", "es": "Presencia" } }
+      ]
+    }
+  ]
+}

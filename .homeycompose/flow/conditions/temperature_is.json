@@ -1,0 +1,32 @@
+{
+  "id": "temperature_is",
+  "title": {
+    "en": "The temperature is !{{above|below}} [[temperature]]°C",
+    "es": "La temperatura es !{{superior|inferior}} a [[temperature]]°C"
+  },
+  "titleFormatted": {
+    "en": "The temperature is !{{above|below}} [[temperature]]°C",
+    "es": "La temperatura es !{{superior|inferior}} a [[temperature]]°C"
+  },
+  "hint": {
+    "en": "Check if the current temperature is above or below a value.",
+    "es": "Comprueba si la temperatura actual está por encima o por debajo de un valor."
+  },
+  "args": [
+    {
+      "type": "device",
+      "name": "device",
+      "filter": "driver_id=radiator"
+    },
+    {
+      "type": "range",
+      "name": "temperature",
+      "title": { "en": "Temperature", "es": "Temperatura" },
+      "min": 5,
+      "max": 35,
+      "step": 0.5,
+      "label": "°C",
+      "labelDecimals": 1
+    }
+  ]
+}

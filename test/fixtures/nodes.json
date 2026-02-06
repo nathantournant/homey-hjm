@@ -1,0 +1,17 @@
+[
+  {
+    "addr": "1",
+    "name": "Living Room Radiator",
+    "type": "htr"
+  },
+  {
+    "addr": "2",
+    "name": "Kitchen Radiator",
+    "type": "htr"
+  },
+  {
+    "addr": "3",
+    "name": "Hallway Thermostat",
+    "type": "thm"
+  }
+]

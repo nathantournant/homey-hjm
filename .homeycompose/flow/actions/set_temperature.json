@@ -1,0 +1,32 @@
+{
+  "id": "set_temperature",
+  "title": {
+    "en": "Set the temperature",
+    "es": "Establecer la temperatura"
+  },
+  "titleFormatted": {
+    "en": "Set the temperature to [[temperature]]°C",
+    "es": "Establecer la temperatura a [[temperature]]°C"
+  },
+  "hint": {
+    "en": "Set the target temperature of the radiator.",
+    "es": "Establece la temperatura objetivo del radiador."
+  },
+  "args": [
+    {
+      "type": "device",
+      "name": "device",
+      "filter": "driver_id=radiator"
+    },
+    {
+      "type": "range",
+      "name": "temperature",
+      "title": { "en": "Temperature", "es": "Temperatura" },
+      "min": 5,
+      "max": 35,
+      "step": 0.5,
+      "label": "°C",
+      "labelDecimals": 1
+    }
+  ]
+}

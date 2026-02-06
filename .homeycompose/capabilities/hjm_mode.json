@@ -1,0 +1,32 @@
+{
+  "type": "enum",
+  "title": {
+    "en": "Mode",
+    "es": "Modo"
+  },
+  "uiComponent": "picker",
+  "getable": true,
+  "setable": true,
+  "values": [
+    {
+      "id": "off",
+      "title": { "en": "Off", "es": "Apagado" }
+    },
+    {
+      "id": "manual",
+      "title": { "en": "Manual", "es": "Manual" }
+    },
+    {
+      "id": "auto",
+      "title": { "en": "Auto", "es": "Automático" }
+    },
+    {
+      "id": "self_learn",
+      "title": { "en": "Self Learning", "es": "Autoaprendizaje" }
+    },
+    {
+      "id": "presence",
+      "title": { "en": "Presence", "es": "Presencia" }
+    }
+  ]
+}

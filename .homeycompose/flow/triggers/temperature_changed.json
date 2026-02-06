@@ -1,0 +1,30 @@
+{
+  "id": "temperature_changed",
+  "title": {
+    "en": "The temperature changed",
+    "es": "La temperatura cambió"
+  },
+  "titleFormatted": {
+    "en": "The temperature changed",
+    "es": "La temperatura cambió"
+  },
+  "hint": {
+    "en": "Triggers when the measured temperature changes.",
+    "es": "Se activa cuando cambia la temperatura medida."
+  },
+  "args": [
+    {
+      "type": "device",
+      "name": "device",
+      "filter": "driver_id=radiator"
+    }
+  ],
+  "tokens": [
+    {
+      "name": "temperature",
+      "type": "number",
+      "title": { "en": "Temperature", "es": "Temperatura" },
+      "example": 21.5
+    }
+  ]
+}

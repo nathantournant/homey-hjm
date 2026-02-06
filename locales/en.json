@@ -1,0 +1,14 @@
+{
+  "pair": {
+    "login": {
+      "title": "Log in to HJM",
+      "hint": "Enter your HJM app credentials (same email and password you use in the HJM mobile app)."
+    }
+  },
+  "errors": {
+    "invalid_credentials": "Invalid credentials. Check your HJM app login.",
+    "connection_failed": "Could not connect to HJM cloud. Check your internet.",
+    "rate_limited": "Too many requests. Please wait a moment.",
+    "unknown": "An unexpected error occurred."
+  }
+}

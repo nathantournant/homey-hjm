@@ -1,0 +1,30 @@
+{
+  "id": "mode_changed",
+  "title": {
+    "en": "The mode changed",
+    "es": "El modo cambió"
+  },
+  "titleFormatted": {
+    "en": "The mode changed",
+    "es": "El modo cambió"
+  },
+  "hint": {
+    "en": "Triggers when the radiator mode changes.",
+    "es": "Se activa cuando cambia el modo del radiador."
+  },
+  "args": [
+    {
+      "type": "device",
+      "name": "device",
+      "filter": "driver_id=radiator"
+    }
+  ],
+  "tokens": [
+    {
+      "name": "mode",
+      "type": "string",
+      "title": { "en": "Mode", "es": "Modo" },
+      "example": "auto"
+    }
+  ]
+}

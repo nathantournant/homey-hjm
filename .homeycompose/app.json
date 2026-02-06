@@ -1,0 +1,30 @@
+{
+  "id": "com.hjm.radiator",
+  "version": "1.0.0",
+  "compatibility": ">=12.0.0",
+  "sdk": 3,
+  "platforms": ["local"],
+  "name": {
+    "en": "HJM Radiator",
+    "es": "Radiador HJM"
+  },
+  "description": {
+    "en": "Control your HJM WiFi radiators",
+    "es": "Controla tus radiadores HJM WiFi"
+  },
+  "category": ["climate"],
+  "permissions": [],
+  "images": {
+    "small": "/assets/images/small.png",
+    "large": "/assets/images/large.png",
+    "xlarge": "/assets/images/xlarge.png"
+  },
+  "author": {
+    "name": "Nathan Tournant"
+  },
+  "brandColor": "#E30613",
+  "tags": {
+    "en": ["hjm", "radiator", "heater", "helki", "thermostat"],
+    "es": ["hjm", "radiador", "calefactor", "helki", "termostato"]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "pair": {
+    "login": {
+      "title": "Iniciar sesión en HJM",
+      "hint": "Introduce tus credenciales de la app HJM (el mismo correo y contraseña que usas en la app móvil HJM)."
+    }
+  },
+  "errors": {
+    "invalid_credentials": "Credenciales inválidas. Comprueba tu inicio de sesión en la app HJM.",
+    "connection_failed": "No se pudo conectar a la nube HJM. Comprueba tu conexión a internet.",
+    "rate_limited": "Demasiadas solicitudes. Espera un momento.",
+    "unknown": "Ha ocurrido un error inesperado."
+  }
+}

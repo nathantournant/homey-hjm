@@ -1,0 +1,12 @@
+[
+  {
+    "dev_id": "smartbox-001",
+    "name": "Living Room SmartBox",
+    "connected": true
+  },
+  {
+    "dev_id": "smartbox-002",
+    "name": "Bedroom SmartBox",
+    "connected": false
+  }
+]

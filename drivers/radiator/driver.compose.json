@@ -1,0 +1,50 @@
+{
+  "name": {
+    "en": "HJM Radiator",
+    "es": "Radiador HJM"
+  },
+  "class": "thermostat",
+  "platforms": ["local"],
+  "connectivity": ["cloud"],
+  "capabilities": [
+    "measure_temperature",
+    "target_temperature",
+    "hjm_mode"
+  ],
+  "capabilitiesOptions": {
+    "target_temperature": {
+      "min": 5,
+      "max": 35,
+      "step": 0.5
+    }
+  },
+  "pair": [
+    {
+      "id": "login",
+      "template": "login_credentials",
+      "options": {
+        "title": { "en": "Log in to HJM", "es": "Iniciar sesión en HJM" },
+        "usernameLabel": { "en": "Email", "es": "Correo electrónico" },
+        "usernamePlaceholder": { "en": "your@email.com" },
+        "passwordLabel": { "en": "Password", "es": "Contraseña" },
+        "passwordPlaceholder": { "en": "Your HJM app password" }
+      }
+    },
+    {
+      "id": "list_devices",
+      "template": "list_devices",
+      "navigation": { "next": "add_devices" },
+      "options": {
+        "title": { "en": "Select Radiators", "es": "Seleccionar Radiadores" }
+      }
+    },
+    {
+      "id": "add_devices",
+      "template": "add_devices"
+    }
+  ],
+  "images": {
+    "small": "{{driverAssetsPath}}/images/small.png",
+    "large": "{{driverAssetsPath}}/images/large.png"
+  }
+}
