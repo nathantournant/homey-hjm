@@ -30,7 +30,6 @@ jobs:
 
   integration:
     runs-on: ubuntu-latest
-    if: secrets.HELKI_USERNAME != ''
     steps:
       - uses: actions/checkout@v4
 
@@ -42,10 +41,16 @@ jobs:
       - run: npm ci
       - run: npm run build
       - name: Run integration tests
+        if: ${{ env.HELKI_USERNAME != '' }}
         env:
           HELKI_USERNAME: ${{ secrets.HELKI_USERNAME }}
           HELKI_PASSWORD: ${{ secrets.HELKI_PASSWORD }}
         run: npm test -- --testPathPattern=integration
+      - name: Skip integration tests
+        if: ${{ env.HELKI_USERNAME == '' }}
+        env:
+          HELKI_USERNAME: ${{ secrets.HELKI_USERNAME }}
+        run: echo "Skipped - HELKI_USERNAME secret not configured"
 
   validate:
     runs-on: ubuntu-latest
