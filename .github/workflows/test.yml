@@ -30,7 +30,7 @@ jobs:
 
   integration:
     runs-on: ubuntu-latest
-    if: vars.HELKI_USERNAME != ''
+    if: secrets.HELKI_USERNAME != ''
     steps:
       - uses: actions/checkout@v4
 
@@ -43,7 +43,7 @@ jobs:
       - run: npm run build
       - name: Run integration tests
         env:
-          HELKI_USERNAME: ${{ vars.HELKI_USERNAME }}
+          HELKI_USERNAME: ${{ secrets.HELKI_USERNAME }}
           HELKI_PASSWORD: ${{ secrets.HELKI_PASSWORD }}
         run: npm test -- --testPathPattern=integration
 
