@@ -95,11 +95,20 @@ npm run test:coverage   # With coverage report
 
 ### Integration Tests
 
-Integration tests hit the real Helki API and are skipped by default. To run them:
+Integration tests hit the real Helki API and are skipped by default.
 
+**Locally:**
 ```bash
 HELKI_USERNAME=your@email.com HELKI_PASSWORD=yourpassword npm test
 ```
+
+**In CI:** set two GitHub project variables so the `integration` job runs automatically:
+
+1. Go to **Settings > Secrets and variables > Actions**
+2. Under **Variables**, add `HELKI_USERNAME` (your HJM email)
+3. Under **Secrets**, add `HELKI_PASSWORD` (your HJM password)
+
+The integration job is skipped when these are not configured.
 
 ## How It Works
 

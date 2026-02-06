@@ -27,6 +27,25 @@ jobs:
         with:
           files: ./coverage/lcov.info
 
+  integration:
+    runs-on: ubuntu-latest
+    if: vars.HELKI_USERNAME != ''
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - run: npm ci
+      - run: npm run build
+      - name: Run integration tests
+        env:
+          HELKI_USERNAME: ${{ vars.HELKI_USERNAME }}
+          HELKI_PASSWORD: ${{ secrets.HELKI_PASSWORD }}
+        run: npm test -- --testPathPattern=integration
+
   validate:
     runs-on: ubuntu-latest
     steps:
