@@ -102,11 +102,11 @@ Integration tests hit the real Helki API and are skipped by default.
 HELKI_USERNAME=your@email.com HELKI_PASSWORD=yourpassword npm test
 ```
 
-**In CI:** set two GitHub project variables so the `integration` job runs automatically:
+**In CI:** set two GitHub secrets so the `integration` job runs automatically:
 
-1. Go to **Settings > Secrets and variables > Actions**
-2. Under **Variables**, add `HELKI_USERNAME` (your HJM email)
-3. Under **Secrets**, add `HELKI_PASSWORD` (your HJM password)
+1. Go to **Settings > Secrets and variables > Actions > Secrets**
+2. Add `HELKI_USERNAME` (your HJM email)
+3. Add `HELKI_PASSWORD` (your HJM password)
 
 The integration job is skipped when these are not configured.
 
