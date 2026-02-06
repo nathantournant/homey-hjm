@@ -15,6 +15,7 @@ jest.mock('../../../../lib/HelkiApiClient', () => ({
   })),
 }));
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const HJMRadiatorDriver = require('../../../../drivers/radiator/driver');
 
 describe('HJMRadiatorDriver', () => {
@@ -110,9 +111,9 @@ describe('HJMRadiatorDriver', () => {
 
   describe('onPair', () => {
     it('should register login and list_devices handlers', async () => {
-      const handlers: Record<string, Function> = {};
+      const handlers: Record<string, (...args: unknown[]) => unknown> = {};
       const session = {
-        setHandler: jest.fn((event: string, handler: Function) => {
+        setHandler: jest.fn((event: string, handler: (...args: unknown[]) => unknown) => {
           handlers[event] = handler;
         }),
       };
@@ -130,9 +131,9 @@ describe('HJMRadiatorDriver', () => {
     });
 
     it('should authenticate on login and store credentials', async () => {
-      const handlers: Record<string, Function> = {};
+      const handlers: Record<string, (...args: unknown[]) => unknown> = {};
       const session = {
-        setHandler: jest.fn((event: string, handler: Function) => {
+        setHandler: jest.fn((event: string, handler: (...args: unknown[]) => unknown) => {
           handlers[event] = handler;
         }),
       };
@@ -154,9 +155,9 @@ describe('HJMRadiatorDriver', () => {
     });
 
     it('should throw on failed login', async () => {
-      const handlers: Record<string, Function> = {};
+      const handlers: Record<string, (...args: unknown[]) => unknown> = {};
       const session = {
-        setHandler: jest.fn((event: string, handler: Function) => {
+        setHandler: jest.fn((event: string, handler: (...args: unknown[]) => unknown) => {
           handlers[event] = handler;
         }),
       };

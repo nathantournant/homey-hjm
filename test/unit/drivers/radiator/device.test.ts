@@ -27,7 +27,7 @@ jest.mock('../../../../lib/HelkiApiClient', () => ({
   })),
 }));
 
-// We need to test the device class directly, so we require it after mocking
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const HJMRadiatorDevice = require('../../../../drivers/radiator/device');
 
 describe('HJMRadiatorDevice', () => {
