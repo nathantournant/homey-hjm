@@ -18,10 +18,7 @@ describe('HelkiTokenManager', () => {
   describe('authenticate', () => {
     it('should obtain access token with valid credentials', async () => {
       nock(API_BASE)
-        .post('/api/v2/client/token', {
-          username: 'user@test.com',
-          password: 'password123',
-        })
+        .post('/client/token', 'grant_type=password&username=user%40test.com&password=password123')
         .reply(200, {
           access_token: 'test-token-abc',
           refresh_token: 'refresh-abc',
@@ -35,7 +32,7 @@ describe('HelkiTokenManager', () => {
     });
 
     it('should throw on invalid credentials (401)', async () => {
-      nock(API_BASE).post('/api/v2/client/token').reply(401);
+      nock(API_BASE).post('/client/token').reply(401);
 
       await expect(
         manager.authenticate('bad@test.com', 'wrong')
@@ -44,7 +41,7 @@ describe('HelkiTokenManager', () => {
 
     it('should throw on network failure', async () => {
       nock(API_BASE)
-        .post('/api/v2/client/token')
+        .post('/client/token')
         .replyWithError({ code: 'ECONNREFUSED' });
 
       await expect(
@@ -56,7 +53,7 @@ describe('HelkiTokenManager', () => {
   describe('getToken', () => {
     it('should return cached token if not expired', async () => {
       nock(API_BASE)
-        .post('/api/v2/client/token')
+        .post('/client/token')
         .reply(200, {
           access_token: 'cached-token',
           expires_in: 14400,
@@ -69,7 +66,7 @@ describe('HelkiTokenManager', () => {
 
     it('should refresh token when expired', async () => {
       nock(API_BASE)
-        .post('/api/v2/client/token')
+        .post('/client/token')
         .reply(200, {
           access_token: 'token-1',
           expires_in: 0, // Immediately expired
@@ -78,7 +75,7 @@ describe('HelkiTokenManager', () => {
       await manager.authenticate('user@test.com', 'pass');
 
       nock(API_BASE)
-        .post('/api/v2/client/token')
+        .post('/client/token')
         .reply(200, {
           access_token: 'token-2',
           expires_in: 14400,
@@ -98,7 +95,7 @@ describe('HelkiTokenManager', () => {
 
     it('should deduplicate concurrent refresh calls', async () => {
       nock(API_BASE)
-        .post('/api/v2/client/token')
+        .post('/client/token')
         .reply(200, {
           access_token: 'initial',
           expires_in: 14400,
@@ -108,7 +105,7 @@ describe('HelkiTokenManager', () => {
       manager.invalidate();
 
       nock(API_BASE)
-        .post('/api/v2/client/token')
+        .post('/client/token')
         .once()
         .reply(200, {
           access_token: 'refreshed',
@@ -128,7 +125,7 @@ describe('HelkiTokenManager', () => {
   describe('invalidate', () => {
     it('should clear the stored token', async () => {
       nock(API_BASE)
-        .post('/api/v2/client/token')
+        .post('/client/token')
         .reply(200, {
           access_token: 'token',
           expires_in: 14400,

@@ -8,7 +8,7 @@ const API_BASE = 'https://api-hjm.helki.com';
 
 function authScope() {
   return nock(API_BASE)
-    .post('/api/v2/client/token')
+    .post('/client/token')
     .reply(200, {
       access_token: 'test-token',
       refresh_token: 'test-refresh',
@@ -39,7 +39,7 @@ describe('HelkiApiClient', () => {
     it('should throw user-friendly error on invalid credentials', async () => {
       nock.cleanAll();
       const newClient = new HelkiApiClient(API_BASE);
-      nock(API_BASE).post('/api/v2/client/token').reply(401);
+      nock(API_BASE).post('/client/token').reply(401);
 
       await expect(
         newClient.authenticate('bad@test.com', 'wrong')
@@ -141,7 +141,7 @@ describe('HelkiApiClient', () => {
       nock(API_BASE).get('/api/v2/devs').reply(401);
 
       nock(API_BASE)
-        .post('/api/v2/client/token')
+        .post('/client/token')
         .reply(200, {
           access_token: 'new-token',
           expires_in: 14400,

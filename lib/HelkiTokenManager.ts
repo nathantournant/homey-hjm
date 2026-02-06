@@ -3,8 +3,8 @@ import { HelkiTokenResponse, HelkiCredentials } from './types';
 
 const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000; // Refresh 5 minutes before expiry
 
-// App-level OAuth client credentials for the Helki API (from HJM app)
-const HELKI_BASIC_AUTH = 'aGptLWFwcDo='; // base64("hjm-app:")
+// OAuth client credentials for the Smartbox/Helki API (from smartbox Python lib)
+const HELKI_BASIC_AUTH = 'NTRiY2NiZmI0MWE5YTUxMTNmMDQ4OGQwOnZkaXZkaQ==';
 
 export class HelkiTokenManager {
   private accessToken: string | null = null;
@@ -56,14 +56,19 @@ export class HelkiTokenManager {
     }
 
     try {
+      const params = new URLSearchParams();
+      params.append('grant_type', 'password');
+      params.append('username', this.credentials.username);
+      params.append('password', this.credentials.password);
+
       const response = await axios.post<HelkiTokenResponse>(
-        `${this.apiBase}/api/v2/client/token`,
+        `${this.apiBase}/client/token`,
+        params,
         {
-          username: this.credentials.username,
-          password: this.credentials.password,
-        },
-        {
-          headers: { Authorization: `Basic ${HELKI_BASIC_AUTH}` },
+          headers: {
+            Authorization: `Basic ${HELKI_BASIC_AUTH}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
           timeout: 15000,
         }
       );
