@@ -121,7 +121,7 @@ describe('HJMRadiatorDevice', () => {
 
       await tempListener(23.5);
       expect(mockSetNodeStatus).toHaveBeenCalledWith(
-        'smartbox-001', 'htr', 1, { mtemp: 23.5 }
+        'smartbox-001', 'htr', 1, { stemp: 23.5 }
       );
     });
 
@@ -195,11 +195,11 @@ describe('HJMRadiatorDevice', () => {
       expect(mockGetNodeStatus).toHaveBeenCalledWith('smartbox-001', 'htr', 1);
       expect(device.setCapabilityValue).toHaveBeenCalledWith(
         'measure_temperature',
-        21.5
+        22.0
       );
       expect(device.setCapabilityValue).toHaveBeenCalledWith(
         'target_temperature',
-        22.0
+        21.5
       );
       expect(device.setCapabilityValue).toHaveBeenCalledWith(
         'hjm_mode',
@@ -232,7 +232,7 @@ describe('HJMRadiatorDevice', () => {
   });
 
   describe('updateCapabilities', () => {
-    it('should trigger temperature_changed flow card when temp changes', async () => {
+    it('should trigger temperature_changed flow card when measured temp changes', async () => {
       device.getCapabilityValue.mockImplementation((cap: string) => {
         if (cap === 'measure_temperature') return 20.0;
         if (cap === 'hjm_mode') return 'auto';
@@ -249,19 +249,19 @@ describe('HJMRadiatorDevice', () => {
         'temperature_changed'
       );
       expect(triggerMock).toHaveBeenCalledWith(device, {
-        temperature: 21.5,
+        temperature: 22.0,
       });
     });
 
     it('should trigger mode_changed flow card when mode changes', async () => {
       device.getCapabilityValue.mockImplementation((cap: string) => {
-        if (cap === 'measure_temperature') return 21.5;
+        if (cap === 'measure_temperature') return 22.0;
         if (cap === 'hjm_mode') return 'auto';
         return null;
       });
 
       await device.updateCapabilities.call(device, {
-        stemp: 21.5,
+        mtemp: 22.0,
         mode: 'manual',
       });
 
@@ -273,13 +273,13 @@ describe('HJMRadiatorDevice', () => {
 
     it('should NOT trigger flow cards when values are unchanged', async () => {
       device.getCapabilityValue.mockImplementation((cap: string) => {
-        if (cap === 'measure_temperature') return 21.5;
+        if (cap === 'measure_temperature') return 22.0;
         if (cap === 'hjm_mode') return 'auto';
         return null;
       });
 
       await device.updateCapabilities.call(device, {
-        stemp: 21.5,
+        mtemp: 22.0,
         mode: 'auto',
       });
 
@@ -316,11 +316,11 @@ describe('HJMRadiatorDevice', () => {
 
       expect(device.setCapabilityValue).toHaveBeenCalledWith(
         'measure_temperature',
-        23.5
+        24.0
       );
       expect(device.setCapabilityValue).toHaveBeenCalledWith(
         'target_temperature',
-        24.0
+        23.5
       );
     });
 
@@ -361,11 +361,11 @@ describe('HJMRadiatorDevice', () => {
 
       expect(device.setCapabilityValue).toHaveBeenCalledWith(
         'measure_temperature',
-        25.0
+        26.0
       );
       expect(device.setCapabilityValue).toHaveBeenCalledWith(
         'target_temperature',
-        26.0
+        25.0
       );
     });
   });
@@ -380,7 +380,7 @@ describe('HJMRadiatorDevice', () => {
         'smartbox-001',
         'htr',
         1,
-        { mtemp: 23.5 }
+        { stemp: 23.5 }
       );
     });
   });

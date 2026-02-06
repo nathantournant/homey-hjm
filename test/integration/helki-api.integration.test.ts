@@ -83,7 +83,7 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
           expect(!isNaN(status.mtemp)).toBe(true);
 
           console.log(
-            `  ${heater.name}: ${status.stemp}°C (target: ${status.mtemp}°C, mode: ${status.mode})`
+            `  ${heater.name}: ${status.mtemp}°C (target: ${status.stemp}°C, mode: ${status.mode})`
           );
         }
       }

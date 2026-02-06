@@ -129,14 +129,14 @@ class HJMRadiatorDevice extends Homey.Device {
     const prevTemp = this.getCapabilityValue('measure_temperature');
     const prevMode = this.getCapabilityValue('hjm_mode');
 
-    if (status.stemp !== undefined && !isNaN(status.stemp)) {
-      await this.setCapabilityValue('measure_temperature', status.stemp).catch(
+    if (status.mtemp !== undefined && !isNaN(status.mtemp)) {
+      await this.setCapabilityValue('measure_temperature', status.mtemp).catch(
         (e) => this.error('Set measure_temperature failed:', e)
       );
     }
 
-    if (status.mtemp !== undefined && !isNaN(status.mtemp)) {
-      await this.setCapabilityValue('target_temperature', status.mtemp).catch(
+    if (status.stemp !== undefined && !isNaN(status.stemp)) {
+      await this.setCapabilityValue('target_temperature', status.stemp).catch(
         (e) => this.error('Set target_temperature failed:', e)
       );
     }
@@ -148,10 +148,10 @@ class HJMRadiatorDevice extends Homey.Device {
     }
 
     // Trigger flow cards on changes
-    if (status.stemp !== undefined && status.stemp !== prevTemp) {
+    if (status.mtemp !== undefined && status.mtemp !== prevTemp) {
       await this.homey.flow
         .getDeviceTriggerCard('temperature_changed')
-        .trigger(this, { temperature: status.stemp })
+        .trigger(this, { temperature: status.mtemp })
         .catch((e) => this.error('Trigger temperature_changed failed:', e));
     }
 
@@ -166,7 +166,7 @@ class HJMRadiatorDevice extends Homey.Device {
   private async setTargetTemperature(value: number): Promise<void> {
     const { deviceId, nodeType, nodeAddr } = this.getData() as DeviceData;
     await this.api.setNodeStatus(deviceId, nodeType, nodeAddr, {
-      mtemp: value,
+      stemp: value,
     });
     this.log('Set temperature to', value);
   }

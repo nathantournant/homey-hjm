@@ -131,6 +131,9 @@ export class HelkiApiClient {
     const headers = await this.authHeaders();
     // Convert numeric temps back to strings for the API
     const apiStatus: Record<string, unknown> = {};
+    if (status.stemp !== undefined) {
+      apiStatus.stemp = String(status.stemp);
+    }
     if (status.mtemp !== undefined) {
       apiStatus.mtemp = String(status.mtemp);
     }

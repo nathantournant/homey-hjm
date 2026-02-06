@@ -36,8 +36,8 @@ export interface HelkiNode {
 // Our parsing layer converts them to numbers for Homey capabilities.
 
 export interface HelkiRawNodeStatus {
-  stemp: string;              // Sensor (current) temperature - STRING
-  mtemp: string;              // Manual (target) temperature - STRING
+  stemp: string;              // Set (target) temperature - STRING
+  mtemp: string;              // Measured (current) temperature - STRING
   mode: string;               // off, manual, auto, self_learn, presence
   active: boolean;            // Whether the heater is currently heating
   units: string;              // Temperature units (e.g. "C")

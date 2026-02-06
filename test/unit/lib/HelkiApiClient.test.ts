@@ -126,7 +126,18 @@ describe('HelkiApiClient', () => {
   });
 
   describe('setNodeStatus', () => {
-    it('should convert numeric temperature to string for API', async () => {
+    it('should convert numeric stemp (set/target) to string for API', async () => {
+      nock(API_BASE)
+        .post('/api/v2/devs/smartbox-001/htr/1/status', { stemp: '23' })
+        .matchHeader('Authorization', 'Bearer test-token')
+        .reply(200);
+
+      await expect(
+        client.setNodeStatus('smartbox-001', 'htr', 1, { stemp: 23 })
+      ).resolves.toBeUndefined();
+    });
+
+    it('should convert numeric mtemp (measured) to string for API', async () => {
       nock(API_BASE)
         .post('/api/v2/devs/smartbox-001/htr/1/status', { mtemp: '23' })
         .matchHeader('Authorization', 'Bearer test-token')
@@ -160,7 +171,7 @@ describe('HelkiApiClient', () => {
     it('should send combined fields', async () => {
       nock(API_BASE)
         .post('/api/v2/devs/smartbox-001/htr/1/status', {
-          mtemp: '22.5',
+          stemp: '22.5',
           mode: 'auto',
           active: false,
         })
@@ -168,7 +179,7 @@ describe('HelkiApiClient', () => {
 
       await expect(
         client.setNodeStatus('smartbox-001', 'htr', 1, {
-          mtemp: 22.5,
+          stemp: 22.5,
           mode: 'auto',
           active: false,
         })
