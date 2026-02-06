@@ -40,4 +40,4 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm install -g homey
-      - run: homey app validate
+      - run: homey app validate --level community
