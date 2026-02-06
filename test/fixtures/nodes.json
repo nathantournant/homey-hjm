@@ -1,17 +1,25 @@
-[
-  {
-    "addr": "1",
-    "name": "Living Room Radiator",
-    "type": "htr"
-  },
-  {
-    "addr": "2",
-    "name": "Kitchen Radiator",
-    "type": "htr"
-  },
-  {
-    "addr": "3",
-    "name": "Hallway Thermostat",
-    "type": "thm"
-  }
-]
+{
+  "nodes": [
+    {
+      "addr": 1,
+      "name": "Living Room Radiator",
+      "type": "htr",
+      "installed": true,
+      "lost": false
+    },
+    {
+      "addr": 2,
+      "name": "Kitchen Radiator",
+      "type": "htr",
+      "installed": true,
+      "lost": false
+    },
+    {
+      "addr": 3,
+      "name": "Hallway Thermostat",
+      "type": "thm",
+      "installed": true,
+      "lost": false
+    }
+  ]
+}

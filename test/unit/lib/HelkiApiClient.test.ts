@@ -12,7 +12,9 @@ function authScope() {
     .post('/api/v2/client/token')
     .reply(200, {
       access_token: 'test-token',
+      refresh_token: 'test-refresh',
       expires_in: 14400,
+      token_type: 'Bearer',
     });
 }
 
@@ -47,7 +49,7 @@ describe('HelkiApiClient', () => {
   });
 
   describe('getDevices', () => {
-    it('should return list of devices', async () => {
+    it('should unwrap and return devs array from wrapped response', async () => {
       nock(API_BASE)
         .get('/api/v2/devs')
         .matchHeader('Authorization', 'Bearer test-token')
@@ -56,12 +58,22 @@ describe('HelkiApiClient', () => {
       const devices = await client.getDevices();
       expect(devices).toHaveLength(2);
       expect(devices[0].dev_id).toBe('smartbox-001');
-      expect(devices[0].connected).toBe(true);
+      expect(devices[0].name).toBe('Living Room SmartBox');
+      expect(devices[0].product_id).toBe('hjm_noelle');
+    });
+
+    it('should handle empty device list', async () => {
+      nock(API_BASE)
+        .get('/api/v2/devs')
+        .reply(200, { devs: [], invited_to: [] });
+
+      const devices = await client.getDevices();
+      expect(devices).toHaveLength(0);
     });
   });
 
   describe('getNodes', () => {
-    it('should return nodes for a device', async () => {
+    it('should unwrap and return nodes array from wrapped response', async () => {
       nock(API_BASE)
         .get('/api/v2/devs/smartbox-001/mgr/nodes')
         .matchHeader('Authorization', 'Bearer test-token')
@@ -70,55 +82,65 @@ describe('HelkiApiClient', () => {
       const nodes = await client.getNodes('smartbox-001');
       expect(nodes).toHaveLength(3);
       expect(nodes[0].type).toBe('htr');
+      expect(nodes[0].addr).toBe(1);  // number, not string
+      expect(nodes[0].installed).toBe(true);
     });
   });
 
   describe('getNodeStatus', () => {
-    it('should return node status', async () => {
+    it('should parse string temperatures to numbers', async () => {
       nock(API_BASE)
         .get('/api/v2/devs/smartbox-001/htr/1/status')
         .matchHeader('Authorization', 'Bearer test-token')
         .reply(200, statusFixture);
 
-      const status = await client.getNodeStatus('smartbox-001', 'htr', '1');
-      expect(status.stemp).toBe(21.5);
-      expect(status.mtemp).toBe(22.0);
+      const status = await client.getNodeStatus('smartbox-001', 'htr', 1);
+      expect(status.stemp).toBe(21.5);    // parsed from "21.5"
+      expect(status.mtemp).toBe(22.0);    // parsed from "22.0"
+      expect(typeof status.stemp).toBe('number');
+      expect(typeof status.mtemp).toBe('number');
       expect(status.mode).toBe('auto');
       expect(status.active).toBe(true);
+    });
+
+    it('should handle integer temperature strings', async () => {
+      nock(API_BASE)
+        .get('/api/v2/devs/smartbox-001/htr/1/status')
+        .reply(200, { ...statusFixture, stemp: '20', mtemp: '22' });
+
+      const status = await client.getNodeStatus('smartbox-001', 'htr', 1);
+      expect(status.stemp).toBe(20);
+      expect(status.mtemp).toBe(22);
     });
   });
 
   describe('setNodeStatus', () => {
-    it('should set temperature', async () => {
+    it('should convert numeric temperature to string for API', async () => {
       nock(API_BASE)
-        .post('/api/v2/devs/smartbox-001/htr/1/status', { mtemp: 23.0 })
+        .post('/api/v2/devs/smartbox-001/htr/1/status', { mtemp: '23' })
         .matchHeader('Authorization', 'Bearer test-token')
         .reply(200);
 
       await expect(
-        client.setNodeStatus('smartbox-001', 'htr', '1', { mtemp: 23.0 })
+        client.setNodeStatus('smartbox-001', 'htr', 1, { mtemp: 23 })
       ).resolves.toBeUndefined();
     });
 
-    it('should set mode', async () => {
+    it('should send mode as-is', async () => {
       nock(API_BASE)
         .post('/api/v2/devs/smartbox-001/htr/1/status', { mode: 'manual' })
         .reply(200);
 
       await expect(
-        client.setNodeStatus('smartbox-001', 'htr', '1', { mode: 'manual' })
+        client.setNodeStatus('smartbox-001', 'htr', 1, { mode: 'manual' })
       ).resolves.toBeUndefined();
     });
   });
 
   describe('token refresh on 401', () => {
     it('should auto-refresh and retry on 401', async () => {
-      // First call returns 401
-      nock(API_BASE)
-        .get('/api/v2/devs')
-        .reply(401);
+      nock(API_BASE).get('/api/v2/devs').reply(401);
 
-      // Token refresh
       nock(API_BASE)
         .post('/api/v2/client/token')
         .reply(200, {
@@ -126,7 +148,6 @@ describe('HelkiApiClient', () => {
           expires_in: 14400,
         });
 
-      // Retry with new token
       nock(API_BASE)
         .get('/api/v2/devs')
         .matchHeader('Authorization', 'Bearer new-token')
@@ -141,9 +162,7 @@ describe('HelkiApiClient', () => {
     it('should throw on rate limit (429)', async () => {
       nock(API_BASE).get('/api/v2/devs').reply(429);
 
-      await expect(client.getDevices()).rejects.toThrow(
-        'Too many requests'
-      );
+      await expect(client.getDevices()).rejects.toThrow('Too many requests');
     });
 
     it('should throw on connection error', async () => {
@@ -158,14 +177,15 @@ describe('HelkiApiClient', () => {
   });
 
   describe('getAwayStatus', () => {
-    it('should return away status', async () => {
+    it('should return away status with forced field', async () => {
       nock(API_BASE)
         .get('/api/v2/devs/smartbox-001/mgr/away_status')
-        .reply(200, { away: false, enabled: true });
+        .reply(200, { away: false, enabled: true, forced: false });
 
       const status = await client.getAwayStatus('smartbox-001');
       expect(status.away).toBe(false);
       expect(status.enabled).toBe(true);
+      expect(status.forced).toBe(false);
     });
   });
 

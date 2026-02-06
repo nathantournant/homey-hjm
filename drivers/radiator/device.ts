@@ -1,7 +1,12 @@
 import Homey from 'homey';
 import { HelkiApiClient } from '../../lib/HelkiApiClient';
 import { HelkiSocketClient } from '../../lib/HelkiSocketClient';
-import { DeviceData, HelkiNodeStatus, HelkiSocketUpdate } from '../../lib/types';
+import {
+  DeviceData,
+  HelkiNodeStatus,
+  HelkiSocketUpdate,
+  parseNodeStatus,
+} from '../../lib/types';
 
 const POLL_INTERVAL_MS = 60000;
 
@@ -101,12 +106,15 @@ class HJMRadiatorDevice extends Homey.Device {
     );
     if (!node?.status) return;
 
-    await this.updateCapabilities(node.status as HelkiNodeStatus);
+    // Parse string temperatures from socket to numbers
+    const parsed = parseNodeStatus(node.status);
+    await this.updateCapabilities(parsed);
   }
 
   private async pollStatus(): Promise<void> {
     try {
       const { deviceId, nodeType, nodeAddr } = this.getData() as DeviceData;
+      // getNodeStatus already parses string temps to numbers
       const status = await this.api.getNodeStatus(deviceId, nodeType, nodeAddr);
       await this.updateCapabilities(status);
 
@@ -119,17 +127,19 @@ class HJMRadiatorDevice extends Homey.Device {
     }
   }
 
-  private async updateCapabilities(status: HelkiNodeStatus): Promise<void> {
+  private async updateCapabilities(
+    status: Partial<HelkiNodeStatus>
+  ): Promise<void> {
     const prevTemp = this.getCapabilityValue('measure_temperature');
     const prevMode = this.getCapabilityValue('hjm_mode');
 
-    if (status.stemp !== undefined) {
+    if (status.stemp !== undefined && !isNaN(status.stemp)) {
       await this.setCapabilityValue('measure_temperature', status.stemp).catch(
         (e) => this.error('Set measure_temperature failed:', e)
       );
     }
 
-    if (status.mtemp !== undefined) {
+    if (status.mtemp !== undefined && !isNaN(status.mtemp)) {
       await this.setCapabilityValue('target_temperature', status.mtemp).catch(
         (e) => this.error('Set target_temperature failed:', e)
       );

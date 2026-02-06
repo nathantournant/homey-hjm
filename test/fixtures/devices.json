@@ -1,12 +1,19 @@
-[
-  {
-    "dev_id": "smartbox-001",
-    "name": "Living Room SmartBox",
-    "connected": true
-  },
-  {
-    "dev_id": "smartbox-002",
-    "name": "Bedroom SmartBox",
-    "connected": false
-  }
-]
+{
+  "devs": [
+    {
+      "dev_id": "smartbox-001",
+      "name": "Living Room SmartBox",
+      "product_id": "hjm_noelle",
+      "fw_version": "2.1.0",
+      "serial_id": "SB001234"
+    },
+    {
+      "dev_id": "smartbox-002",
+      "name": "Bedroom SmartBox",
+      "product_id": "hjm_ixora",
+      "fw_version": "2.0.5",
+      "serial_id": "SB005678"
+    }
+  ],
+  "invited_to": []
+}

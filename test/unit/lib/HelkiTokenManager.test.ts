@@ -25,6 +25,7 @@ describe('HelkiTokenManager', () => {
         })
         .reply(200, {
           access_token: 'test-token-abc',
+          refresh_token: 'refresh-abc',
           expires_in: 14400,
           token_type: 'Bearer',
         });
@@ -68,7 +69,6 @@ describe('HelkiTokenManager', () => {
     });
 
     it('should refresh token when expired', async () => {
-      // First auth
       nock(API_BASE)
         .post('/api/v2/client/token')
         .reply(200, {
@@ -78,7 +78,6 @@ describe('HelkiTokenManager', () => {
 
       await manager.authenticate('user@test.com', 'pass');
 
-      // Refresh
       nock(API_BASE)
         .post('/api/v2/client/token')
         .reply(200, {
@@ -109,7 +108,6 @@ describe('HelkiTokenManager', () => {
       await manager.authenticate('user@test.com', 'pass');
       manager.invalidate();
 
-      // Only one HTTP call should be made for concurrent refreshes
       nock(API_BASE)
         .post('/api/v2/client/token')
         .once()

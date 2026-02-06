@@ -1,6 +1,24 @@
 {
-  "stemp": 21.5,
-  "mtemp": 22.0,
+  "stemp": "21.5",
+  "mtemp": "22.0",
   "mode": "auto",
-  "active": true
+  "active": true,
+  "units": "C",
+  "sync_status": "ok",
+  "error_code": "",
+  "locked": false,
+  "presence": true,
+  "window_open": false,
+  "boost": false,
+  "true_radiant_active": false,
+  "eco_temp": "18.0",
+  "comf_temp": "22.0",
+  "ice_temp": "7.0",
+  "power": "1500",
+  "duty": 50,
+  "act_duty": 45,
+  "pcb_temp": "35.2",
+  "power_pcb_temp": "40.1",
+  "boost_end_min": 0,
+  "boost_end_day": 0
 }

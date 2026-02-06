@@ -3,7 +3,7 @@ import { HelkiApiClient } from '../../lib/HelkiApiClient';
 
 interface PairDevice {
   name: string;
-  data: Record<string, string>;
+  data: Record<string, string | number>;
   store?: Record<string, string>;
 }
 
@@ -23,8 +23,6 @@ class HJMRadiatorDriver extends Homey.Driver {
     const homeyDevices: PairDevice[] = [];
 
     for (const device of devices) {
-      if (!device.connected) continue;
-
       const nodes = await api.getNodes(device.dev_id);
 
       for (const node of nodes) {
@@ -35,7 +33,7 @@ class HJMRadiatorDriver extends Homey.Driver {
           data: {
             deviceId: device.dev_id,
             nodeType: node.type,
-            nodeAddr: node.addr,
+            nodeAddr: node.addr,  // number from API
           },
           store: {
             deviceName: device.name,
@@ -55,7 +53,6 @@ class HJMRadiatorDriver extends Homey.Driver {
       async (data: { username: string; password: string }) => {
         try {
           await api.authenticate(data.username, data.password);
-          // Store credentials for token refresh
           this.homey.settings.set('credentials', {
             username: data.username,
             password: data.password,
