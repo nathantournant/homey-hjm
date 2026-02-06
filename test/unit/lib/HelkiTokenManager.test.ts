@@ -2,13 +2,12 @@ import nock from 'nock';
 import { HelkiTokenManager } from '../../../lib/HelkiTokenManager';
 
 const API_BASE = 'https://api-hjm.helki.com';
-const BASIC_AUTH = 'dGVzdDp0ZXN0';
 
 describe('HelkiTokenManager', () => {
   let manager: HelkiTokenManager;
 
   beforeEach(() => {
-    manager = new HelkiTokenManager(API_BASE, BASIC_AUTH);
+    manager = new HelkiTokenManager(API_BASE);
     nock.cleanAll();
   });
 

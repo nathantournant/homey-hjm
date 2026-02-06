@@ -8,7 +8,6 @@
  *
  * Optional env vars:
  *   HELKI_API_BASE  - API host (default: https://api-hjm.helki.com)
- *   HELKI_BASIC_AUTH - Base64 Basic Auth credentials
  */
 
 import { HelkiApiClient } from '../../lib/HelkiApiClient';
@@ -16,7 +15,6 @@ import { HelkiApiClient } from '../../lib/HelkiApiClient';
 const HELKI_USERNAME = process.env.HELKI_USERNAME;
 const HELKI_PASSWORD = process.env.HELKI_PASSWORD;
 const HELKI_API_BASE = process.env.HELKI_API_BASE || 'https://api-hjm.helki.com';
-const HELKI_BASIC_AUTH = process.env.HELKI_BASIC_AUTH || '';
 
 const describeIf = (condition: boolean) =>
   condition ? describe : describe.skip;
@@ -27,7 +25,7 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
     let client: HelkiApiClient;
 
     beforeAll(async () => {
-      client = new HelkiApiClient(HELKI_API_BASE, HELKI_BASIC_AUTH);
+      client = new HelkiApiClient(HELKI_API_BASE);
       await client.authenticate(HELKI_USERNAME!, HELKI_PASSWORD!);
     });
 

@@ -11,20 +11,15 @@ import {
   parseNodeStatus,
 } from './types';
 
-// TODO: Confirm these values by sniffing HJM app traffic
 const DEFAULT_API_BASE = 'https://api-hjm.helki.com';
-const DEFAULT_BASIC_AUTH = 'PLACEHOLDER_BASE64_CREDENTIALS';
 
 export class HelkiApiClient {
   private client: AxiosInstance;
   private tokenManager: HelkiTokenManager;
   private isRefreshing = false;
 
-  constructor(
-    apiBase: string = DEFAULT_API_BASE,
-    basicAuth: string = DEFAULT_BASIC_AUTH
-  ) {
-    this.tokenManager = new HelkiTokenManager(apiBase, basicAuth);
+  constructor(apiBase: string = DEFAULT_API_BASE) {
+    this.tokenManager = new HelkiTokenManager(apiBase);
 
     this.client = axios.create({
       baseURL: apiBase,

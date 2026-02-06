@@ -3,16 +3,16 @@ import { HelkiTokenResponse, HelkiCredentials } from './types';
 
 const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000; // Refresh 5 minutes before expiry
 
+// App-level OAuth client credentials for the Helki API (from HJM app)
+const HELKI_BASIC_AUTH = 'aGptLWFwcDo='; // base64("hjm-app:")
+
 export class HelkiTokenManager {
   private accessToken: string | null = null;
   private tokenExpiresAt = 0;
   private credentials: HelkiCredentials | null = null;
   private refreshPromise: Promise<string> | null = null;
 
-  constructor(
-    private readonly apiBase: string,
-    private readonly basicAuth: string
-  ) {}
+  constructor(private readonly apiBase: string) {}
 
   async authenticate(username: string, password: string): Promise<string> {
     this.credentials = { username, password };
@@ -63,7 +63,7 @@ export class HelkiTokenManager {
           password: this.credentials.password,
         },
         {
-          headers: { Authorization: `Basic ${this.basicAuth}` },
+          headers: { Authorization: `Basic ${HELKI_BASIC_AUTH}` },
           timeout: 15000,
         }
       );

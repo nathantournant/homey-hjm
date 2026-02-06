@@ -5,7 +5,6 @@ import nodesFixture from '../../fixtures/nodes.json';
 import statusFixture from '../../fixtures/status.json';
 
 const API_BASE = 'https://api-hjm.helki.com';
-const BASIC_AUTH = 'dGVzdDp0ZXN0';
 
 function authScope() {
   return nock(API_BASE)
@@ -23,7 +22,7 @@ describe('HelkiApiClient', () => {
 
   beforeEach(async () => {
     nock.cleanAll();
-    client = new HelkiApiClient(API_BASE, BASIC_AUTH);
+    client = new HelkiApiClient(API_BASE);
     authScope();
     await client.authenticate('user@test.com', 'password');
   });
@@ -39,7 +38,7 @@ describe('HelkiApiClient', () => {
 
     it('should throw user-friendly error on invalid credentials', async () => {
       nock.cleanAll();
-      const newClient = new HelkiApiClient(API_BASE, BASIC_AUTH);
+      const newClient = new HelkiApiClient(API_BASE);
       nock(API_BASE).post('/api/v2/client/token').reply(401);
 
       await expect(
