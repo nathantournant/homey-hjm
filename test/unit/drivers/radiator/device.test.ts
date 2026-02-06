@@ -18,12 +18,14 @@ const mockSetNodeStatus = jest.fn();
 const mockGetTokenManager = jest.fn(() => ({
   getToken: jest.fn().mockResolvedValue('test-token'),
 }));
+const mockGetApiBase = jest.fn(() => 'https://api-hjm.helki.com');
 
 jest.mock('../../../../lib/HelkiApiClient', () => ({
   HelkiApiClient: jest.fn().mockImplementation(() => ({
     getNodeStatus: mockGetNodeStatus,
     setNodeStatus: mockSetNodeStatus,
     getTokenManager: mockGetTokenManager,
+    getApiBase: mockGetApiBase,
   })),
 }));
 
@@ -49,6 +51,7 @@ describe('HJMRadiatorDevice', () => {
       getNodeStatus: mockGetNodeStatus,
       setNodeStatus: mockSetNodeStatus,
       getTokenManager: mockGetTokenManager,
+      getApiBase: mockGetApiBase,
     };
     device.homey.app = { api: apiMock };
     // pollStatus/setTargetTemperature/setMode use this.api (set in onInit)
@@ -71,6 +74,110 @@ describe('HJMRadiatorDevice', () => {
 
   afterEach(() => {
     homeyMock.__cleanup();
+  });
+
+  describe('onInit', () => {
+    it('should set up API, listeners, polling, socket, and initial poll', async () => {
+      mockGetNodeStatus.mockResolvedValue({
+        stemp: 20.0,
+        mtemp: 21.0,
+        mode: 'auto',
+        active: true,
+      });
+
+      await device.onInit.call(device);
+
+      expect(device.registerCapabilityListener).toHaveBeenCalledWith(
+        'target_temperature',
+        expect.any(Function)
+      );
+      expect(device.registerCapabilityListener).toHaveBeenCalledWith(
+        'hjm_mode',
+        expect.any(Function)
+      );
+      // Poll interval should be set
+      expect(homeyMock.setInterval).toHaveBeenCalled();
+      // Initial poll fetched status
+      expect(mockGetNodeStatus).toHaveBeenCalled();
+      expect(device.log).toHaveBeenCalledWith(
+        'HJM Radiator initialized:',
+        'Test Radiator'
+      );
+    });
+
+    it('should register working target_temperature capability listener', async () => {
+      mockGetNodeStatus.mockResolvedValue({
+        stemp: 20.0, mtemp: 21.0, mode: 'auto', active: true,
+      });
+      mockSetNodeStatus.mockResolvedValue(undefined);
+
+      await device.onInit.call(device);
+
+      // Extract the registered listener
+      const tempCall = device.registerCapabilityListener.mock.calls.find(
+        (c: any[]) => c[0] === 'target_temperature'
+      );
+      const tempListener = tempCall[1];
+
+      await tempListener(23.5);
+      expect(mockSetNodeStatus).toHaveBeenCalledWith(
+        'smartbox-001', 'htr', 1, { mtemp: 23.5 }
+      );
+    });
+
+    it('should register working hjm_mode capability listener', async () => {
+      mockGetNodeStatus.mockResolvedValue({
+        stemp: 20.0, mtemp: 21.0, mode: 'auto', active: true,
+      });
+      mockSetNodeStatus.mockResolvedValue(undefined);
+
+      await device.onInit.call(device);
+
+      // Extract the registered listener
+      const modeCall = device.registerCapabilityListener.mock.calls.find(
+        (c: any[]) => c[0] === 'hjm_mode'
+      );
+      const modeListener = modeCall[1];
+
+      await modeListener('manual');
+      expect(mockSetNodeStatus).toHaveBeenCalledWith(
+        'smartbox-001', 'htr', 1, { mode: 'manual' }
+      );
+    });
+  });
+
+  describe('onUninit', () => {
+    it('should clear poll interval and disconnect socket', async () => {
+      mockGetNodeStatus.mockResolvedValue({
+        stemp: 20.0,
+        mtemp: 21.0,
+        mode: 'auto',
+        active: true,
+      });
+
+      await device.onInit.call(device);
+      await device.onUninit.call(device);
+
+      expect(homeyMock.clearInterval).toHaveBeenCalled();
+      expect(device.log).toHaveBeenCalledWith(
+        'HJM Radiator uninitialized:',
+        'Test Radiator'
+      );
+    });
+  });
+
+  describe('connectSocket', () => {
+    it('should create socket client and register event handlers', async () => {
+      mockGetNodeStatus.mockResolvedValue({
+        stemp: 20.0, mtemp: 21.0, mode: 'auto', active: true,
+      });
+
+      await device.onInit.call(device);
+
+      // connectSocket was called during onInit; socketClient should be set
+      expect(device.socketClient).toBeDefined();
+      expect(device.socketClient).not.toBeNull();
+    });
   });
 
   describe('pollStatus', () => {
@@ -236,6 +343,30 @@ describe('HJMRadiatorDevice', () => {
     it('should ignore updates with no nodes', async () => {
       await device.handleSocketUpdate.call(device, {});
       expect(device.setCapabilityValue).not.toHaveBeenCalled();
+    });
+
+    it('should match node with string addr via Number() coercion (BUG-5)', async () => {
+      // Socket updates may send addr as a string
+      const socketData = {
+        nodes: [
+          {
+            addr: '1', // string instead of number
+            type: 'htr',
+            status: { stemp: '25.0', mtemp: '26.0', mode: 'auto', active: false },
+          },
+        ],
+      };
+
+      await device.handleSocketUpdate.call(device, socketData);
+
+      expect(device.setCapabilityValue).toHaveBeenCalledWith(
+        'measure_temperature',
+        25.0
+      );
+      expect(device.setCapabilityValue).toHaveBeenCalledWith(
+        'target_temperature',
+        26.0
+      );
     });
   });
 

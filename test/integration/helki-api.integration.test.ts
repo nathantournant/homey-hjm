@@ -88,6 +88,64 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
         }
       }
     });
+
+    it('should refresh token after invalidation', async () => {
+      // Force token invalidation
+      client.getTokenManager().invalidate();
+      expect(client.isAuthenticated()).toBe(false);
+
+      // Next API call should auto-refresh
+      const devices = await client.getDevices();
+      expect(Array.isArray(devices)).toBe(true);
+      expect(client.isAuthenticated()).toBe(true);
+    });
+
+    it('should get away status for first device', async () => {
+      const devices = await client.getDevices();
+      if (devices.length === 0) {
+        console.log('No devices found, skipping away status test');
+        return;
+      }
+
+      const awayStatus = await client.getAwayStatus(devices[0].dev_id);
+      expect(typeof awayStatus.away).toBe('boolean');
+      expect(typeof awayStatus.enabled).toBe('boolean');
+      console.log(`Away status for ${devices[0].name}:`, awayStatus);
+    });
+
+    it('should throw on invalid device ID', async () => {
+      await expect(
+        client.getNodes('non-existent-device-12345')
+      ).rejects.toThrow();
+    });
+
+    it('should handle no-op setNodeStatus (write current value back)', async () => {
+      const devices = await client.getDevices();
+      if (devices.length === 0) return;
+
+      const nodes = await client.getNodes(devices[0].dev_id);
+      const heater = nodes.find((n) => n.type === 'htr');
+      if (!heater) return;
+
+      const status = await client.getNodeStatus(
+        devices[0].dev_id,
+        heater.type,
+        heater.addr
+      );
+
+      // Write the same mode back — should be a no-op
+      await client.setNodeStatus(devices[0].dev_id, heater.type, heater.addr, {
+        mode: status.mode,
+      });
+
+      // Verify unchanged
+      const statusAfter = await client.getNodeStatus(
+        devices[0].dev_id,
+        heater.type,
+        heater.addr
+      );
+      expect(statusAfter.mode).toBe(status.mode);
+    });
   }
 );
 

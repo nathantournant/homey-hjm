@@ -5,6 +5,8 @@ module.exports = {
   testMatch: ['**/*.test.ts'],
   collectCoverageFrom: [
     'lib/**/*.ts',
+    'app.ts',
+    'drivers/**/*.ts',
     '!**/*.d.ts'
   ],
   coverageThreshold: {

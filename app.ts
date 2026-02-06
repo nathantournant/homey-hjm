@@ -29,7 +29,6 @@ class HJMApp extends Homey.App {
       .getActionCard('set_temperature')
       .registerRunListener(async (args) => {
         const device = args.device;
-        await device.setCapabilityValue('target_temperature', args.temperature);
         await device.triggerCapabilityListener('target_temperature', args.temperature);
       });
 
@@ -38,7 +37,6 @@ class HJMApp extends Homey.App {
       .getActionCard('set_mode')
       .registerRunListener(async (args) => {
         const device = args.device;
-        await device.setCapabilityValue('hjm_mode', args.mode);
         await device.triggerCapabilityListener('hjm_mode', args.mode);
       });
 

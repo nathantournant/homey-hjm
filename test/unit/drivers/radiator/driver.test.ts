@@ -44,6 +44,13 @@ describe('HJMRadiatorDriver', () => {
     homeyMock.__cleanup();
   });
 
+  describe('onInit', () => {
+    it('should log initialization message', async () => {
+      await driver.onInit.call(driver);
+      expect(driver.log).toHaveBeenCalledWith('HJM Radiator driver initialized');
+    });
+  });
+
   describe('onPairListDevices', () => {
     it('should return heater nodes as pair devices', async () => {
       mockGetDevices.mockResolvedValue([
@@ -152,6 +159,29 @@ describe('HJMRadiatorDriver', () => {
         username: 'user@test.com',
         password: 'pass123',
       });
+    });
+
+    it('should return devices from list_devices handler', async () => {
+      const handlers: Record<string, (...args: unknown[]) => unknown> = {};
+      const session = {
+        setHandler: jest.fn((event: string, handler: (...args: unknown[]) => unknown) => {
+          handlers[event] = handler;
+        }),
+      };
+
+      mockIsAuthenticated.mockReturnValue(true);
+      mockGetDevices.mockResolvedValue([
+        { dev_id: 'sb-001', name: 'Box' },
+      ]);
+      mockGetNodes.mockResolvedValue([
+        { addr: 1, name: 'Heater', type: 'htr' },
+      ]);
+
+      await driver.onPair(session);
+      const devices = await handlers['list_devices']();
+
+      expect(devices).toHaveLength(1);
+      expect((devices as any[])[0].name).toBe('Heater');
     });
 
     it('should throw on failed login', async () => {

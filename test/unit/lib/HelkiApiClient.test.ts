@@ -47,6 +47,18 @@ describe('HelkiApiClient', () => {
     });
   });
 
+  describe('getApiBase', () => {
+    it('should return the configured API base URL', () => {
+      expect(client.getApiBase()).toBe(API_BASE);
+    });
+
+    it('should use default API base when none provided', () => {
+      nock.cleanAll();
+      const defaultClient = new HelkiApiClient();
+      expect(defaultClient.getApiBase()).toBe('https://api-hjm.helki.com');
+    });
+  });
+
   describe('getDevices', () => {
     it('should unwrap and return devs array from wrapped response', async () => {
       nock(API_BASE)
@@ -134,6 +146,34 @@ describe('HelkiApiClient', () => {
         client.setNodeStatus('smartbox-001', 'htr', 1, { mode: 'manual' })
       ).resolves.toBeUndefined();
     });
+
+    it('should send active field as-is', async () => {
+      nock(API_BASE)
+        .post('/api/v2/devs/smartbox-001/htr/1/status', { active: true })
+        .reply(200);
+
+      await expect(
+        client.setNodeStatus('smartbox-001', 'htr', 1, { active: true })
+      ).resolves.toBeUndefined();
+    });
+
+    it('should send combined fields', async () => {
+      nock(API_BASE)
+        .post('/api/v2/devs/smartbox-001/htr/1/status', {
+          mtemp: '22.5',
+          mode: 'auto',
+          active: false,
+        })
+        .reply(200);
+
+      await expect(
+        client.setNodeStatus('smartbox-001', 'htr', 1, {
+          mtemp: 22.5,
+          mode: 'auto',
+          active: false,
+        })
+      ).resolves.toBeUndefined();
+    });
   });
 
   describe('token refresh on 401', () => {
@@ -154,6 +194,42 @@ describe('HelkiApiClient', () => {
 
       const devices = await client.getDevices();
       expect(devices).toHaveLength(2);
+    });
+
+    it('should deduplicate concurrent 401 refresh requests (BUG-1)', async () => {
+      // Both requests get 401
+      nock(API_BASE).get('/api/v2/devs').reply(401);
+      nock(API_BASE)
+        .get('/api/v2/devs/smartbox-001/mgr/nodes')
+        .reply(401);
+
+      // Only ONE token refresh should happen
+      nock(API_BASE)
+        .post('/client/token')
+        .once()
+        .reply(200, {
+          access_token: 'refreshed-token',
+          expires_in: 14400,
+        });
+
+      // Retry requests with new token
+      nock(API_BASE)
+        .get('/api/v2/devs')
+        .matchHeader('Authorization', 'Bearer refreshed-token')
+        .reply(200, devicesFixture);
+
+      nock(API_BASE)
+        .get('/api/v2/devs/smartbox-001/mgr/nodes')
+        .matchHeader('Authorization', 'Bearer refreshed-token')
+        .reply(200, nodesFixture);
+
+      const [devices, nodes] = await Promise.all([
+        client.getDevices(),
+        client.getNodes('smartbox-001'),
+      ]);
+
+      expect(devices).toHaveLength(2);
+      expect(nodes).toHaveLength(3);
     });
   });
 
@@ -185,6 +261,16 @@ describe('HelkiApiClient', () => {
       expect(status.away).toBe(false);
       expect(status.enabled).toBe(true);
       expect(status.forced).toBe(false);
+    });
+
+    it('should throw on error for invalid device', async () => {
+      nock(API_BASE)
+        .get('/api/v2/devs/invalid-device/mgr/away_status')
+        .reply(404);
+
+      await expect(
+        client.getAwayStatus('invalid-device')
+      ).rejects.toThrow();
     });
   });
 

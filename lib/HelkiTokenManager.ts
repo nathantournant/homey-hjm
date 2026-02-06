@@ -38,11 +38,7 @@ export class HelkiTokenManager {
   }
 
   isAuthenticated(): boolean {
-    return this.accessToken !== null;
-  }
-
-  setCredentials(credentials: HelkiCredentials): void {
-    this.credentials = credentials;
+    return this.accessToken !== null && Date.now() < this.tokenExpiresAt;
   }
 
   invalidate(): void {

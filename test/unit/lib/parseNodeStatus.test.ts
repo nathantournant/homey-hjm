@@ -85,4 +85,22 @@ describe('parseNodeStatus', () => {
     expect(result.window_open).toBe(false);
     expect(result.boost).toBe(false);
   });
+
+  it('should return undefined for empty string temps (BUG-3)', () => {
+    const result = parseNodeStatus({ stemp: '', mtemp: '' });
+    expect(result.stemp).toBeUndefined();
+    expect(result.mtemp).toBeUndefined();
+  });
+
+  it('should return undefined for non-numeric temps like "N/A" (BUG-3)', () => {
+    const result = parseNodeStatus({ stemp: 'N/A', mtemp: 'error' });
+    expect(result.stemp).toBeUndefined();
+    expect(result.mtemp).toBeUndefined();
+  });
+
+  it('should handle mixed valid and invalid temps', () => {
+    const result = parseNodeStatus({ stemp: '21.5', mtemp: 'N/A' });
+    expect(result.stemp).toBe(21.5);
+    expect(result.mtemp).toBeUndefined();
+  });
 });

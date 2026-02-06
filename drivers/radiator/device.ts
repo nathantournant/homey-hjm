@@ -57,16 +57,12 @@ class HJMRadiatorDevice extends Homey.Device {
     this.log('HJM Radiator uninitialized:', this.getName());
   }
 
-  async onDeleted(): Promise<void> {
-    await this.onUninit();
-  }
-
   private async connectSocket(): Promise<void> {
     const { deviceId } = this.getData() as DeviceData;
     const tokenManager = this.api.getTokenManager();
 
     this.socketClient = new HelkiSocketClient(
-      'https://api-hjm.helki.com',
+      this.api.getApiBase(),
       tokenManager,
       deviceId
     );
@@ -102,7 +98,7 @@ class HJMRadiatorDevice extends Homey.Device {
     if (!data.nodes) return;
 
     const node = data.nodes.find(
-      (n) => n.addr === nodeAddr && n.type === nodeType
+      (n) => Number(n.addr) === nodeAddr && n.type === nodeType
     );
     if (!node?.status) return;
 

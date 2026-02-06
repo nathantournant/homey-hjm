@@ -16,9 +16,11 @@ const DEFAULT_API_BASE = 'https://api-hjm.helki.com';
 export class HelkiApiClient {
   private client: AxiosInstance;
   private tokenManager: HelkiTokenManager;
-  private isRefreshing = false;
+  private refreshPromise: Promise<string> | null = null;
+  private readonly apiBase: string;
 
   constructor(apiBase: string = DEFAULT_API_BASE) {
+    this.apiBase = apiBase;
     this.tokenManager = new HelkiTokenManager(apiBase);
 
     this.client = axios.create({
@@ -32,22 +34,25 @@ export class HelkiApiClient {
         const originalRequest = error.config;
         if (
           error.response?.status === 401 &&
-          originalRequest &&
-          !this.isRefreshing
+          originalRequest
         ) {
-          this.isRefreshing = true;
-          try {
+          if (!this.refreshPromise) {
             this.tokenManager.invalidate();
-            const token = await this.tokenManager.refresh();
-            originalRequest.headers['Authorization'] = `Bearer ${token}`;
-            return this.client.request(originalRequest);
-          } finally {
-            this.isRefreshing = false;
+            this.refreshPromise = this.tokenManager.refresh().finally(() => {
+              this.refreshPromise = null;
+            });
           }
+          const token = await this.refreshPromise;
+          originalRequest.headers['Authorization'] = `Bearer ${token}`;
+          return this.client.request(originalRequest);
         }
         throw this.translateError(error);
       }
     );
+  }
+
+  getApiBase(): string {
+    return this.apiBase;
   }
 
   async authenticate(username: string, password: string): Promise<void> {

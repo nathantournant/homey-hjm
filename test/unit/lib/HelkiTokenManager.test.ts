@@ -122,6 +122,37 @@ describe('HelkiTokenManager', () => {
     });
   });
 
+  describe('isAuthenticated', () => {
+    it('should return false when no token is set', () => {
+      expect(manager.isAuthenticated()).toBe(false);
+    });
+
+    it('should return true when token is valid and not expired', async () => {
+      nock(API_BASE)
+        .post('/client/token')
+        .reply(200, {
+          access_token: 'token',
+          expires_in: 14400,
+        });
+
+      await manager.authenticate('user@test.com', 'pass');
+      expect(manager.isAuthenticated()).toBe(true);
+    });
+
+    it('should return false when token is expired (BUG-2)', async () => {
+      nock(API_BASE)
+        .post('/client/token')
+        .reply(200, {
+          access_token: 'token',
+          expires_in: 0, // Immediately expired (expires_in=0 → expiresAt = now - buffer)
+        });
+
+      await manager.authenticate('user@test.com', 'pass');
+      // With expires_in=0, tokenExpiresAt = Date.now() + 0 - buffer → already in the past
+      expect(manager.isAuthenticated()).toBe(false);
+    });
+  });
+
   describe('invalidate', () => {
     it('should clear the stored token', async () => {
       nock(API_BASE)
@@ -136,6 +167,12 @@ describe('HelkiTokenManager', () => {
 
       manager.invalidate();
       expect(manager.isAuthenticated()).toBe(false);
+    });
+  });
+
+  describe('setCredentials removed', () => {
+    it('should not have a setCredentials method', () => {
+      expect((manager as any).setCredentials).toBeUndefined();
     });
   });
 });

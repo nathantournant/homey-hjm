@@ -123,10 +123,16 @@ export function parseNodeStatus(raw: Partial<HelkiRawNodeStatus>): Partial<Helki
   const parsed: Partial<HelkiNodeStatus> = {};
 
   if (raw.stemp !== undefined) {
-    parsed.stemp = parseFloat(raw.stemp);
+    const val = parseFloat(raw.stemp);
+    if (!isNaN(val)) {
+      parsed.stemp = val;
+    }
   }
   if (raw.mtemp !== undefined) {
-    parsed.mtemp = parseFloat(raw.mtemp);
+    const val = parseFloat(raw.mtemp);
+    if (!isNaN(val)) {
+      parsed.mtemp = val;
+    }
   }
   if (raw.mode !== undefined) {
     parsed.mode = raw.mode;

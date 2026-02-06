@@ -6,6 +6,7 @@ import { HelkiSocketUpdate } from './types';
 const PING_INTERVAL_MS = 20000;
 const RECONNECT_DELAY_MS = 5000;
 const MAX_RECONNECT_ATTEMPTS = 10;
+const MAX_RECONNECT_DELAY_MS = 60000;
 
 export class HelkiSocketClient extends EventEmitter {
   private socket: Socket | null = null;
@@ -103,7 +104,7 @@ export class HelkiSocketClient extends EventEmitter {
     }
 
     this.clearReconnectTimer();
-    const delay = RECONNECT_DELAY_MS * Math.pow(2, this.reconnectAttempts);
+    const delay = Math.min(RECONNECT_DELAY_MS * Math.pow(2, this.reconnectAttempts), MAX_RECONNECT_DELAY_MS);
     this.reconnectAttempts++;
 
     this.reconnectTimer = setTimeout(async () => {
