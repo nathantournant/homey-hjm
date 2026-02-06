@@ -19,23 +19,48 @@ Control your HJM WiFi radiators with [Homey](https://homey.app).
 - HJM ARIA
 - Other HJM WiFi radiators using SmartBox
 
+## Requirements
+
+- **Homey Pro** (sideloading is not supported on Homey Cloud / Homey Bridge)
+- **Node.js** >= 16
+- **Homey CLI** (`npm install -g homey`)
+- An HJM account (same email/password you use in the HJM mobile app)
+
 ## Installation
 
-### From source (Homey Self-Hosted)
+### 1. Install the Homey CLI and log in
+
+```bash
+npm install -g homey
+homey login
+homey select       # Select your Homey Pro on the local network
+```
+
+### 2. Clone, build, and install
 
 ```bash
 git clone https://github.com/nathantournant/homey-hjm.git
 cd homey-hjm
 npm install
 npm run build
-homey app install
+homey app install   # Permanently installs on your Homey
 ```
 
-## Configuration
+The app will now run in the background and survive reboots.
 
-1. Add a new device in Homey
-2. Select "HJM Radiator"
-3. Enter your HJM app credentials (same email/password as the HJM mobile app)
+### Uninstall
+
+```bash
+homey app uninstall
+```
+
+Or from the Homey mobile app: More > Apps > HJM Radiator > Delete.
+
+## Pairing Your Radiators
+
+1. Open the Homey mobile app
+2. Go to **Devices > + (Add Device) > HJM Radiator**
+3. Enter your HJM email and password (same as the HJM mobile app)
 4. Select the radiators you want to add
 
 ## Flow Cards
@@ -57,25 +82,38 @@ homey app install
 ```bash
 npm install
 npm run build
-npm test
-homey app run    # Run on connected Homey
+npm run lint
+homey app run       # Sideload in dev mode (logs stream to terminal, stops on ctrl+c)
 ```
 
-### Running tests
+### Running Tests
 
 ```bash
-npm test              # All tests
-npm run test:unit     # Unit tests only
-npm run test:coverage # With coverage report
+npm test                # All unit tests
+npm run test:coverage   # With coverage report
 ```
 
-## How it works
+### Integration Tests
 
-This app communicates with HJM radiators through the Helki cloud platform (the same backend used by the HJM mobile app). It uses:
+Integration tests hit the real Helki API and are skipped by default. To run them:
+
+```bash
+HELKI_USERNAME=your@email.com HELKI_PASSWORD=yourpassword npm test
+```
+
+## How It Works
+
+This app communicates with HJM radiators through the Helki cloud platform (the same backend used by the HJM mobile app). Authentication uses your HJM email and password — the app exchanges these for a Bearer token internally and handles token refresh automatically.
 
 - **REST API** for device discovery, status reads, and control commands
 - **Socket.io** for real-time temperature and status updates
 - **Polling** (60s interval) as a fallback when the socket connection is unavailable
+
+## Troubleshooting
+
+- **Pairing fails with auth error** — verify your credentials work in the official HJM mobile app first. If they do and it still fails, the OAuth client credentials may need updating (see `lib/HelkiTokenManager.ts`).
+- **Device shows "Connection lost"** — the app will auto-recover on the next poll cycle (60s). Check your internet connection if it persists.
+- **Temperatures not updating** — the Socket.io connection may have dropped. The app falls back to polling every 60 seconds automatically.
 
 ## Credits
 
