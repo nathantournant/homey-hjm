@@ -126,9 +126,9 @@ describe('HelkiApiClient', () => {
   });
 
   describe('setNodeStatus', () => {
-    it('should convert numeric stemp (set/target) to string for API', async () => {
+    it('should convert numeric stemp (set/target) to decimal string for API', async () => {
       nock(API_BASE)
-        .post('/api/v2/devs/smartbox-001/htr/1/status', { stemp: '23', units: 'C' })
+        .post('/api/v2/devs/smartbox-001/htr/1/status', { stemp: '23.0', units: 'C' })
         .matchHeader('Authorization', 'Bearer test-token')
         .reply(200);
 
@@ -137,9 +137,9 @@ describe('HelkiApiClient', () => {
       ).resolves.toBeUndefined();
     });
 
-    it('should convert numeric mtemp (measured) to string for API', async () => {
+    it('should convert numeric mtemp (measured) to decimal string for API', async () => {
       nock(API_BASE)
-        .post('/api/v2/devs/smartbox-001/htr/1/status', { mtemp: '23', units: 'C' })
+        .post('/api/v2/devs/smartbox-001/htr/1/status', { mtemp: '23.0', units: 'C' })
         .matchHeader('Authorization', 'Bearer test-token')
         .reply(200);
 
@@ -289,7 +289,7 @@ describe('HelkiApiClient', () => {
   describe('setAwayStatus', () => {
     it('should update away status', async () => {
       nock(API_BASE)
-        .put('/api/v2/devs/smartbox-001/mgr/away_status', {
+        .post('/api/v2/devs/smartbox-001/mgr/away_status', {
           away: true,
           enabled: true,
         })

@@ -129,13 +129,14 @@ export class HelkiApiClient {
     status: Partial<HelkiNodeStatus>
   ): Promise<void> {
     const headers = await this.authHeaders();
-    // Convert numeric temps back to strings for the API
+    // Convert numeric temps back to decimal strings for the API
+    // The API expects "20.0" format, not "20" — match the format it returns.
     const apiStatus: Record<string, unknown> = {};
     if (status.stemp !== undefined) {
-      apiStatus.stemp = String(status.stemp);
+      apiStatus.stemp = Number(status.stemp).toFixed(1);
     }
     if (status.mtemp !== undefined) {
-      apiStatus.mtemp = String(status.mtemp);
+      apiStatus.mtemp = Number(status.mtemp).toFixed(1);
     }
     if (status.mode !== undefined) {
       apiStatus.mode = status.mode;
@@ -168,9 +169,11 @@ export class HelkiApiClient {
     status: HelkiAwayStatus
   ): Promise<void> {
     const headers = await this.authHeaders();
-    await this.client.put(
+    // API uses POST (not PUT) for setting away status
+    const { away, enabled } = status;
+    await this.client.post(
       `/api/v2/devs/${encodeURIComponent(deviceId)}/mgr/away_status`,
-      status,
+      { away, enabled },
       { headers }
     );
   }

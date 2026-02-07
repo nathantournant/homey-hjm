@@ -242,8 +242,8 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
     let client: HelkiApiClient;
 
     // Global snapshots captured before any mutating test runs
-    let heaterSnapshots: HeaterSnapshot[] = [];
-    let awaySnapshots: AwaySnapshot[] = [];
+    const heaterSnapshots: HeaterSnapshot[] = [];
+    const awaySnapshots: AwaySnapshot[] = [];
 
     beforeAll(async () => {
       client = new HelkiApiClient(HELKI_API_BASE);
@@ -375,6 +375,7 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
     });
 
     // ── Flow 3: Set mode then verify ──
+    // The API requires stemp to be included with mode for the change to persist
     it('should set mode and read it back', async () => {
       const found = await findFirstHeater(client);
       if (!found) return;
@@ -390,6 +391,7 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
       try {
         await client.setNodeStatus(device.dev_id, heater.type, heater.addr, {
           mode: newMode,
+          stemp: original.stemp,
         });
         console.log(`  Set mode to: ${newMode}`);
 
@@ -401,6 +403,7 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
       } finally {
         await client.setNodeStatus(device.dev_id, heater.type, heater.addr, {
           mode: originalMode,
+          stemp: original.stemp,
         }).catch((e) => console.warn(`  [cleanup] restore mode failed: ${e}`));
       }
 
@@ -412,6 +415,7 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
     });
 
     // ── Flow 4: Multi-action step — set mode AND temperature together ──
+    // First: combined mode+temp in one call. Second: two sequential calls.
     it('should set mode and temperature in sequence', async () => {
       const found = await findFirstHeater(client);
       if (!found) return;
@@ -424,21 +428,37 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
         `  Original: mode=${original.mode}, target=${original.stemp}°C`
       );
 
+      // Use a temp offset from current rather than a hard-coded value
+      const nightTemp = original.stemp - 1;
+
       try {
+        // Step 1: Set mode+temp together (combined call)
         await client.setNodeStatus(device.dev_id, heater.type, heater.addr, {
           mode: 'manual',
-        });
-        await client.setNodeStatus(device.dev_id, heater.type, heater.addr, {
-          stemp: 19,
+          stemp: nightTemp,
         });
 
-        const updated = await client.getNodeStatus(
+        const afterCombined = await client.getNodeStatus(
           device.dev_id, heater.type, heater.addr
         );
-        expect(updated.mode).toBe('manual');
-        expect(updated.stemp).toBe(19);
+        expect(afterCombined.mode).toBe('manual');
+        expect(afterCombined.stemp).toBe(nightTemp);
         console.log(
-          `  After multi-action: mode=${updated.mode}, target=${updated.stemp}°C`
+          `  After combined set: mode=${afterCombined.mode}, target=${afterCombined.stemp}°C`
+        );
+
+        // Step 2: Change just the temp (with mode included for API compat)
+        await client.setNodeStatus(device.dev_id, heater.type, heater.addr, {
+          mode: 'manual',
+          stemp: nightTemp + 0.5,
+        });
+
+        const afterSecond = await client.getNodeStatus(
+          device.dev_id, heater.type, heater.addr
+        );
+        expect(afterSecond.stemp).toBe(nightTemp + 0.5);
+        console.log(
+          `  After second set: mode=${afterSecond.mode}, target=${afterSecond.stemp}°C`
         );
       } finally {
         await client.setNodeStatus(device.dev_id, heater.type, heater.addr, {
@@ -580,13 +600,17 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
       }
       const originalAway = await client.getAwayStatus(devices[0].dev_id);
 
+      // Use a "low" temp that's 2 degrees below current for each heater
+      const leaveHomeTemps = originalStates.map((s) => s.status.stemp - 2);
+
       try {
         console.log('  --- Leaving Home ---');
 
-        for (const { device, heater } of heaters) {
+        for (let i = 0; i < heaters.length; i++) {
+          const { device, heater } = heaters[i];
           await client.setNodeStatus(device.dev_id, heater.type, heater.addr, {
             mode: 'manual',
-            stemp: 17,
+            stemp: leaveHomeTemps[i],
           });
         }
 
@@ -595,12 +619,13 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
           enabled: originalAway.enabled,
         });
 
-        for (const { device, heater } of heaters) {
+        for (let i = 0; i < heaters.length; i++) {
+          const { device, heater } = heaters[i];
           const status = await client.getNodeStatus(
             device.dev_id, heater.type, heater.addr
           );
           expect(status.mode).toBe('manual');
-          expect(status.stemp).toBe(17);
+          expect(status.stemp).toBe(leaveHomeTemps[i]);
           console.log(`  ${heater.name}: mode=${status.mode}, target=${status.stemp}°C`);
         }
         const awayAfter = await client.getAwayStatus(devices[0].dev_id);
@@ -646,12 +671,15 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
         device.dev_id, heater.type, heater.addr
       );
 
-      const temps = [18, 19, 20, 21, 22];
+      // Use temps relative to current to stay within the heater's valid range
+      const base = Math.round(original.stemp) - 2;
+      const temps = [base, base + 0.5, base + 1, base + 1.5, base + 2];
       console.log(`  Rapidly setting temps: ${temps.join(' → ')}°C`);
 
       try {
         for (const temp of temps) {
           await client.setNodeStatus(device.dev_id, heater.type, heater.addr, {
+            mode: original.mode,
             stemp: temp,
           });
         }
@@ -663,6 +691,7 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
         console.log(`  Final target temp: ${finalStatus.stemp}°C`);
       } finally {
         await client.setNodeStatus(device.dev_id, heater.type, heater.addr, {
+          mode: original.mode,
           stemp: original.stemp,
         }).catch((e) => console.warn(`  [cleanup] restore temp failed: ${e}`));
       }
