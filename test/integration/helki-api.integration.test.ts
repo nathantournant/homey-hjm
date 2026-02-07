@@ -159,6 +159,13 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
 // captured in beforeAll. Each mutating test also uses try/finally to
 // attempt per-test cleanup. If anything slips through, afterAll does a
 // best-effort restore of the entire environment.
+//
+// Note: The Helki cloud API has propagation delay — a write may return
+// 200 before the device acknowledges it. We use waitForStatus() to
+// poll until the expected value appears (or timeout).
+
+// Longer timeout for integration tests that hit a real API
+const INTEGRATION_TIMEOUT = 30_000;
 
 interface HeaterSnapshot {
   deviceId: string;
@@ -170,6 +177,52 @@ interface HeaterSnapshot {
 interface AwaySnapshot {
   deviceId: string;
   away: import('../../lib/types').HelkiAwayStatus;
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Poll getNodeStatus until the predicate returns true or the timeout expires.
+ * Returns the last status read. Throws if predicate never passes.
+ */
+async function waitForStatus(
+  client: HelkiApiClient,
+  deviceId: string,
+  nodeType: string,
+  nodeAddr: number,
+  predicate: (s: HelkiNodeStatus) => boolean,
+  timeoutMs = 8000,
+  intervalMs = 1500
+): Promise<HelkiNodeStatus> {
+  const deadline = Date.now() + timeoutMs;
+  let last: HelkiNodeStatus | null = null;
+  while (Date.now() < deadline) {
+    last = await client.getNodeStatus(deviceId, nodeType, nodeAddr);
+    if (predicate(last)) return last;
+    await sleep(intervalMs);
+  }
+  // Return last status even if predicate didn't pass — let the caller assert
+  return last!;
+}
+
+/**
+ * Poll getAwayStatus until the predicate returns true or the timeout expires.
+ */
+async function waitForAway(
+  client: HelkiApiClient,
+  deviceId: string,
+  predicate: (a: import('../../lib/types').HelkiAwayStatus) => boolean,
+  timeoutMs = 8000,
+  intervalMs = 1500
+): Promise<import('../../lib/types').HelkiAwayStatus> {
+  const deadline = Date.now() + timeoutMs;
+  let last: import('../../lib/types').HelkiAwayStatus | null = null;
+  while (Date.now() < deadline) {
+    last = await client.getAwayStatus(deviceId);
+    if (predicate(last)) return last;
+    await sleep(intervalMs);
+  }
+  return last!;
 }
 
 /** Helper: find the first heater node across all devices */
@@ -352,30 +405,33 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
       const newTemp = originalTemp === 20 ? 20.5 : 20;
       try {
         await client.setNodeStatus(device.dev_id, heater.type, heater.addr, {
+          mode: original.mode,
           stemp: newTemp,
         });
         console.log(`  Set target temp to: ${newTemp}°C`);
 
-        const updated = await client.getNodeStatus(
-          device.dev_id, heater.type, heater.addr
+        const updated = await waitForStatus(
+          client, device.dev_id, heater.type, heater.addr,
+          (s) => s.stemp === newTemp
         );
         expect(updated.stemp).toBe(newTemp);
         console.log(`  Verified target temp: ${updated.stemp}°C`);
       } finally {
         await client.setNodeStatus(device.dev_id, heater.type, heater.addr, {
+          mode: original.mode,
           stemp: originalTemp,
         }).catch((e) => console.warn(`  [cleanup] restore temp failed: ${e}`));
       }
 
-      const restored = await client.getNodeStatus(
-        device.dev_id, heater.type, heater.addr
+      const restored = await waitForStatus(
+        client, device.dev_id, heater.type, heater.addr,
+        (s) => s.stemp === originalTemp
       );
       expect(restored.stemp).toBe(originalTemp);
       console.log(`  Restored target temp: ${restored.stemp}°C`);
-    });
+    }, INTEGRATION_TIMEOUT);
 
     // ── Flow 3: Set mode then verify ──
-    // The API requires stemp to be included with mode for the change to persist
     it('should set mode and read it back', async () => {
       const found = await findFirstHeater(client);
       if (!found) return;
@@ -395,8 +451,9 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
         });
         console.log(`  Set mode to: ${newMode}`);
 
-        const updated = await client.getNodeStatus(
-          device.dev_id, heater.type, heater.addr
+        const updated = await waitForStatus(
+          client, device.dev_id, heater.type, heater.addr,
+          (s) => s.mode === newMode
         );
         expect(updated.mode).toBe(newMode);
         console.log(`  Verified mode: ${updated.mode}`);
@@ -407,15 +464,15 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
         }).catch((e) => console.warn(`  [cleanup] restore mode failed: ${e}`));
       }
 
-      const restored = await client.getNodeStatus(
-        device.dev_id, heater.type, heater.addr
+      const restored = await waitForStatus(
+        client, device.dev_id, heater.type, heater.addr,
+        (s) => s.mode === originalMode
       );
       expect(restored.mode).toBe(originalMode);
       console.log(`  Restored mode: ${restored.mode}`);
-    });
+    }, INTEGRATION_TIMEOUT);
 
     // ── Flow 4: Multi-action step — set mode AND temperature together ──
-    // First: combined mode+temp in one call. Second: two sequential calls.
     it('should set mode and temperature in sequence', async () => {
       const found = await findFirstHeater(client);
       if (!found) return;
@@ -428,7 +485,6 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
         `  Original: mode=${original.mode}, target=${original.stemp}°C`
       );
 
-      // Use a temp offset from current rather than a hard-coded value
       const nightTemp = original.stemp - 1;
 
       try {
@@ -438,8 +494,9 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
           stemp: nightTemp,
         });
 
-        const afterCombined = await client.getNodeStatus(
-          device.dev_id, heater.type, heater.addr
+        const afterCombined = await waitForStatus(
+          client, device.dev_id, heater.type, heater.addr,
+          (s) => s.mode === 'manual' && s.stemp === nightTemp
         );
         expect(afterCombined.mode).toBe('manual');
         expect(afterCombined.stemp).toBe(nightTemp);
@@ -453,8 +510,9 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
           stemp: nightTemp + 0.5,
         });
 
-        const afterSecond = await client.getNodeStatus(
-          device.dev_id, heater.type, heater.addr
+        const afterSecond = await waitForStatus(
+          client, device.dev_id, heater.type, heater.addr,
+          (s) => s.stemp === nightTemp + 0.5
         );
         expect(afterSecond.stemp).toBe(nightTemp + 0.5);
         console.log(
@@ -467,15 +525,16 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
         }).catch((e) => console.warn(`  [cleanup] restore mode+temp failed: ${e}`));
       }
 
-      const restored = await client.getNodeStatus(
-        device.dev_id, heater.type, heater.addr
+      const restored = await waitForStatus(
+        client, device.dev_id, heater.type, heater.addr,
+        (s) => s.mode === original.mode && s.stemp === original.stemp
       );
       expect(restored.mode).toBe(original.mode);
       expect(restored.stemp).toBe(original.stemp);
       console.log(
         `  Restored: mode=${restored.mode}, target=${restored.stemp}°C`
       );
-    });
+    }, INTEGRATION_TIMEOUT);
 
     // ── Flow 5: Away mode toggle cycle ──
     it('should toggle away mode and restore', async () => {
@@ -487,21 +546,31 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
       console.log(`  Original away status: away=${original.away}, enabled=${original.enabled}`);
 
       try {
-        const toggled = { ...original, away: !original.away };
-        await client.setAwayStatus(device.dev_id, toggled);
+        await client.setAwayStatus(device.dev_id, {
+          away: !original.away,
+          enabled: original.enabled,
+        });
 
-        const afterToggle = await client.getAwayStatus(device.dev_id);
+        const afterToggle = await waitForAway(
+          client, device.dev_id,
+          (a) => a.away === !original.away
+        );
         expect(afterToggle.away).toBe(!original.away);
         console.log(`  After toggle: away=${afterToggle.away}`);
       } finally {
-        await client.setAwayStatus(device.dev_id, original)
-          .catch((e) => console.warn(`  [cleanup] restore away failed: ${e}`));
+        await client.setAwayStatus(device.dev_id, {
+          away: original.away,
+          enabled: original.enabled,
+        }).catch((e) => console.warn(`  [cleanup] restore away failed: ${e}`));
       }
 
-      const restored = await client.getAwayStatus(device.dev_id);
+      const restored = await waitForAway(
+        client, device.dev_id,
+        (a) => a.away === original.away
+      );
       expect(restored.away).toBe(original.away);
       console.log(`  Restored: away=${restored.away}`);
-    });
+    }, INTEGRATION_TIMEOUT);
 
     // ── Flow 6: Concurrent status reads across all heaters ──
     // Read-only: no mutations, no cleanup needed
@@ -586,7 +655,6 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
       const devices = await client.getDevices();
       if (heaters.length === 0 || devices.length === 0) return;
 
-      // Capture originals for this test's try/finally cleanup
       const originalStates: Array<{
         device: HelkiDevice;
         heater: HelkiNode;
@@ -600,7 +668,6 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
       }
       const originalAway = await client.getAwayStatus(devices[0].dev_id);
 
-      // Use a "low" temp that's 2 degrees below current for each heater
       const leaveHomeTemps = originalStates.map((s) => s.status.stemp - 2);
 
       try {
@@ -619,16 +686,21 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
           enabled: originalAway.enabled,
         });
 
+        // Wait for changes to propagate
         for (let i = 0; i < heaters.length; i++) {
           const { device, heater } = heaters[i];
-          const status = await client.getNodeStatus(
-            device.dev_id, heater.type, heater.addr
+          const expectedTemp = leaveHomeTemps[i];
+          const status = await waitForStatus(
+            client, device.dev_id, heater.type, heater.addr,
+            (s) => s.mode === 'manual' && s.stemp === expectedTemp
           );
           expect(status.mode).toBe('manual');
-          expect(status.stemp).toBe(leaveHomeTemps[i]);
+          expect(status.stemp).toBe(expectedTemp);
           console.log(`  ${heater.name}: mode=${status.mode}, target=${status.stemp}°C`);
         }
-        const awayAfter = await client.getAwayStatus(devices[0].dev_id);
+        const awayAfter = await waitForAway(
+          client, devices[0].dev_id, (a) => a.away === true
+        );
         expect(awayAfter.away).toBe(true);
         console.log(`  Away mode: ${awayAfter.away}`);
       } finally {
@@ -641,14 +713,17 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
           }).catch((e) => console.warn(`  [cleanup] restore heater failed: ${e}`));
         }
 
-        await client.setAwayStatus(devices[0].dev_id, originalAway)
-          .catch((e) => console.warn(`  [cleanup] restore away failed: ${e}`));
+        await client.setAwayStatus(devices[0].dev_id, {
+          away: originalAway.away,
+          enabled: originalAway.enabled,
+        }).catch((e) => console.warn(`  [cleanup] restore away failed: ${e}`));
       }
 
-      // Verify rollback
+      // Verify rollback with polling
       for (const { device, heater, status: orig } of originalStates) {
-        const restored = await client.getNodeStatus(
-          device.dev_id, heater.type, heater.addr
+        const restored = await waitForStatus(
+          client, device.dev_id, heater.type, heater.addr,
+          (s) => s.mode === orig.mode && s.stemp === orig.stemp
         );
         expect(restored.mode).toBe(orig.mode);
         expect(restored.stemp).toBe(orig.stemp);
@@ -656,10 +731,12 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
           `  ${heater.name}: mode=${restored.mode}, target=${restored.stemp}°C (restored)`
         );
       }
-      const awayRestored = await client.getAwayStatus(devices[0].dev_id);
+      const awayRestored = await waitForAway(
+        client, devices[0].dev_id, (a) => a.away === originalAway.away
+      );
       expect(awayRestored.away).toBe(originalAway.away);
       console.log(`  Away mode: ${awayRestored.away} (restored)`);
-    });
+    }, INTEGRATION_TIMEOUT);
 
     // ── Flow 10: Rapid sequential temperature changes ──
     it('should handle rapid sequential temperature changes', async () => {
@@ -671,7 +748,6 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
         device.dev_id, heater.type, heater.addr
       );
 
-      // Use temps relative to current to stay within the heater's valid range
       const base = Math.round(original.stemp) - 2;
       const temps = [base, base + 0.5, base + 1, base + 1.5, base + 2];
       console.log(`  Rapidly setting temps: ${temps.join(' → ')}°C`);
@@ -684,10 +760,12 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
           });
         }
 
-        const finalStatus = await client.getNodeStatus(
-          device.dev_id, heater.type, heater.addr
+        const lastTemp = temps[temps.length - 1];
+        const finalStatus = await waitForStatus(
+          client, device.dev_id, heater.type, heater.addr,
+          (s) => s.stemp === lastTemp
         );
-        expect(finalStatus.stemp).toBe(temps[temps.length - 1]);
+        expect(finalStatus.stemp).toBe(lastTemp);
         console.log(`  Final target temp: ${finalStatus.stemp}°C`);
       } finally {
         await client.setNodeStatus(device.dev_id, heater.type, heater.addr, {
@@ -695,7 +773,7 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
           stemp: original.stemp,
         }).catch((e) => console.warn(`  [cleanup] restore temp failed: ${e}`));
       }
-    });
+    }, INTEGRATION_TIMEOUT);
 
     // ── Flow 11: Fresh client re-authentication ──
     // Read-only: no mutations
