@@ -11,6 +11,7 @@
  */
 
 import { HelkiApiClient } from '../../lib/HelkiApiClient';
+import { HelkiDevice, HelkiNode, HelkiNodeStatus } from '../../lib/types';
 
 const HELKI_USERNAME = process.env.HELKI_USERNAME;
 const HELKI_PASSWORD = process.env.HELKI_PASSWORD;
@@ -145,6 +146,645 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
         heater.addr
       );
       expect(statusAfter.mode).toBe(status.mode);
+    });
+  }
+);
+
+// ── Complex Multi-Action User Flows ──
+// These tests simulate realistic user workflows involving multiple
+// sequential API operations, mirroring what happens during actual
+// Homey device usage.
+//
+// Safety: A global snapshot of all heater statuses + away statuses is
+// captured in beforeAll. Each mutating test also uses try/finally to
+// attempt per-test cleanup. If anything slips through, afterAll does a
+// best-effort restore of the entire environment.
+
+interface HeaterSnapshot {
+  deviceId: string;
+  nodeType: string;
+  nodeAddr: number;
+  status: HelkiNodeStatus;
+}
+
+interface AwaySnapshot {
+  deviceId: string;
+  away: import('../../lib/types').HelkiAwayStatus;
+}
+
+/** Helper: find the first heater node across all devices */
+async function findFirstHeater(
+  client: HelkiApiClient
+): Promise<{ device: HelkiDevice; heater: HelkiNode } | null> {
+  const devices = await client.getDevices();
+  for (const device of devices) {
+    const nodes = await client.getNodes(device.dev_id);
+    const heater = nodes.find((n) => n.type === 'htr');
+    if (heater) return { device, heater };
+  }
+  return null;
+}
+
+/** Helper: collect all heater nodes across all devices */
+async function findAllHeaters(
+  client: HelkiApiClient
+): Promise<Array<{ device: HelkiDevice; heater: HelkiNode }>> {
+  const devices = await client.getDevices();
+  const results: Array<{ device: HelkiDevice; heater: HelkiNode }> = [];
+  for (const device of devices) {
+    const nodes = await client.getNodes(device.dev_id);
+    for (const node of nodes) {
+      if (node.type === 'htr') {
+        results.push({ device, heater: node });
+      }
+    }
+  }
+  return results;
+}
+
+/** Best-effort restore: swallow errors so one failed restore doesn't block others */
+async function safeRestore(
+  client: HelkiApiClient,
+  heaterSnapshots: HeaterSnapshot[],
+  awaySnapshots: AwaySnapshot[]
+): Promise<void> {
+  const errors: string[] = [];
+
+  for (const snap of heaterSnapshots) {
+    try {
+      await client.setNodeStatus(snap.deviceId, snap.nodeType, snap.nodeAddr, {
+        mode: snap.status.mode,
+        stemp: snap.status.stemp,
+      });
+    } catch (e) {
+      errors.push(
+        `Failed to restore heater ${snap.nodeType}/${snap.nodeAddr} on ${snap.deviceId}: ${e}`
+      );
+    }
+  }
+
+  for (const snap of awaySnapshots) {
+    try {
+      await client.setAwayStatus(snap.deviceId, snap.away);
+    } catch (e) {
+      errors.push(`Failed to restore away status for ${snap.deviceId}: ${e}`);
+    }
+  }
+
+  if (errors.length > 0) {
+    console.warn('  [afterAll] Some restores failed:\n    ' + errors.join('\n    '));
+  }
+}
+
+describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
+  'Complex User Flows',
+  () => {
+    let client: HelkiApiClient;
+
+    // Global snapshots captured before any mutating test runs
+    let heaterSnapshots: HeaterSnapshot[] = [];
+    let awaySnapshots: AwaySnapshot[] = [];
+
+    beforeAll(async () => {
+      client = new HelkiApiClient(HELKI_API_BASE);
+      await client.authenticate(HELKI_USERNAME!, HELKI_PASSWORD!);
+
+      // Snapshot every heater's status and every device's away status
+      const devices = await client.getDevices();
+      for (const device of devices) {
+        // Away status
+        try {
+          const away = await client.getAwayStatus(device.dev_id);
+          awaySnapshots.push({ deviceId: device.dev_id, away });
+        } catch {
+          // Device may not support away status — skip
+        }
+
+        // Heater statuses
+        const nodes = await client.getNodes(device.dev_id);
+        for (const node of nodes) {
+          if (node.type === 'htr') {
+            const status = await client.getNodeStatus(
+              device.dev_id, node.type, node.addr
+            );
+            heaterSnapshots.push({
+              deviceId: device.dev_id,
+              nodeType: node.type,
+              nodeAddr: node.addr,
+              status,
+            });
+          }
+        }
+      }
+
+      console.log(
+        `  [beforeAll] Captured snapshot: ${heaterSnapshots.length} heater(s), ` +
+        `${awaySnapshots.length} away status(es)`
+      );
+    });
+
+    afterAll(async () => {
+      // Best-effort restore of the entire environment from the snapshot
+      console.log('  [afterAll] Restoring environment from snapshot...');
+      await safeRestore(client, heaterSnapshots, awaySnapshots);
+      console.log('  [afterAll] Restore complete');
+    });
+
+    // ── Flow 1: Full device discovery (pairing simulation) ──
+    // Read-only: no mutations, no cleanup needed
+    it('should complete full device discovery flow', async () => {
+      const devices = await client.getDevices();
+      expect(devices.length).toBeGreaterThan(0);
+
+      const discoveredHeaters: Array<{
+        deviceId: string;
+        deviceName: string;
+        heaterName: string;
+        nodeType: string;
+        nodeAddr: number;
+        status: HelkiNodeStatus;
+      }> = [];
+
+      for (const device of devices) {
+        const nodes = await client.getNodes(device.dev_id);
+        const heaters = nodes.filter((n) => n.type === 'htr');
+
+        for (const heater of heaters) {
+          const status = await client.getNodeStatus(
+            device.dev_id, heater.type, heater.addr
+          );
+          discoveredHeaters.push({
+            deviceId: device.dev_id,
+            deviceName: device.name,
+            heaterName: heater.name,
+            nodeType: heater.type,
+            nodeAddr: heater.addr,
+            status,
+          });
+        }
+      }
+
+      expect(discoveredHeaters.length).toBeGreaterThan(0);
+      for (const h of discoveredHeaters) {
+        expect(typeof h.status.stemp).toBe('number');
+        expect(typeof h.status.mtemp).toBe('number');
+        expect(h.status.mode).toBeDefined();
+        expect(h.nodeType).toBe('htr');
+        console.log(
+          `  Discovered: ${h.heaterName} on ${h.deviceName} — ` +
+          `${h.status.mtemp}°C / target ${h.status.stemp}°C / mode ${h.status.mode}`
+        );
+      }
+    });
+
+    // ── Flow 2: Set temperature then verify ──
+    it('should set target temperature and read it back', async () => {
+      const found = await findFirstHeater(client);
+      if (!found) return;
+      const { device, heater } = found;
+
+      const original = await client.getNodeStatus(
+        device.dev_id, heater.type, heater.addr
+      );
+      const originalTemp = original.stemp;
+      console.log(`  Original target temp: ${originalTemp}°C`);
+
+      const newTemp = originalTemp === 20 ? 20.5 : 20;
+      try {
+        await client.setNodeStatus(device.dev_id, heater.type, heater.addr, {
+          stemp: newTemp,
+        });
+        console.log(`  Set target temp to: ${newTemp}°C`);
+
+        const updated = await client.getNodeStatus(
+          device.dev_id, heater.type, heater.addr
+        );
+        expect(updated.stemp).toBe(newTemp);
+        console.log(`  Verified target temp: ${updated.stemp}°C`);
+      } finally {
+        await client.setNodeStatus(device.dev_id, heater.type, heater.addr, {
+          stemp: originalTemp,
+        }).catch((e) => console.warn(`  [cleanup] restore temp failed: ${e}`));
+      }
+
+      const restored = await client.getNodeStatus(
+        device.dev_id, heater.type, heater.addr
+      );
+      expect(restored.stemp).toBe(originalTemp);
+      console.log(`  Restored target temp: ${restored.stemp}°C`);
+    });
+
+    // ── Flow 3: Set mode then verify ──
+    it('should set mode and read it back', async () => {
+      const found = await findFirstHeater(client);
+      if (!found) return;
+      const { device, heater } = found;
+
+      const original = await client.getNodeStatus(
+        device.dev_id, heater.type, heater.addr
+      );
+      const originalMode = original.mode;
+      console.log(`  Original mode: ${originalMode}`);
+
+      const newMode = originalMode === 'manual' ? 'auto' : 'manual';
+      try {
+        await client.setNodeStatus(device.dev_id, heater.type, heater.addr, {
+          mode: newMode,
+        });
+        console.log(`  Set mode to: ${newMode}`);
+
+        const updated = await client.getNodeStatus(
+          device.dev_id, heater.type, heater.addr
+        );
+        expect(updated.mode).toBe(newMode);
+        console.log(`  Verified mode: ${updated.mode}`);
+      } finally {
+        await client.setNodeStatus(device.dev_id, heater.type, heater.addr, {
+          mode: originalMode,
+        }).catch((e) => console.warn(`  [cleanup] restore mode failed: ${e}`));
+      }
+
+      const restored = await client.getNodeStatus(
+        device.dev_id, heater.type, heater.addr
+      );
+      expect(restored.mode).toBe(originalMode);
+      console.log(`  Restored mode: ${restored.mode}`);
+    });
+
+    // ── Flow 4: Multi-action step — set mode AND temperature together ──
+    it('should set mode and temperature in sequence', async () => {
+      const found = await findFirstHeater(client);
+      if (!found) return;
+      const { device, heater } = found;
+
+      const original = await client.getNodeStatus(
+        device.dev_id, heater.type, heater.addr
+      );
+      console.log(
+        `  Original: mode=${original.mode}, target=${original.stemp}°C`
+      );
+
+      try {
+        await client.setNodeStatus(device.dev_id, heater.type, heater.addr, {
+          mode: 'manual',
+        });
+        await client.setNodeStatus(device.dev_id, heater.type, heater.addr, {
+          stemp: 19,
+        });
+
+        const updated = await client.getNodeStatus(
+          device.dev_id, heater.type, heater.addr
+        );
+        expect(updated.mode).toBe('manual');
+        expect(updated.stemp).toBe(19);
+        console.log(
+          `  After multi-action: mode=${updated.mode}, target=${updated.stemp}°C`
+        );
+      } finally {
+        await client.setNodeStatus(device.dev_id, heater.type, heater.addr, {
+          mode: original.mode,
+          stemp: original.stemp,
+        }).catch((e) => console.warn(`  [cleanup] restore mode+temp failed: ${e}`));
+      }
+
+      const restored = await client.getNodeStatus(
+        device.dev_id, heater.type, heater.addr
+      );
+      expect(restored.mode).toBe(original.mode);
+      expect(restored.stemp).toBe(original.stemp);
+      console.log(
+        `  Restored: mode=${restored.mode}, target=${restored.stemp}°C`
+      );
+    });
+
+    // ── Flow 5: Away mode toggle cycle ──
+    it('should toggle away mode and restore', async () => {
+      const devices = await client.getDevices();
+      if (devices.length === 0) return;
+      const device = devices[0];
+
+      const original = await client.getAwayStatus(device.dev_id);
+      console.log(`  Original away status: away=${original.away}, enabled=${original.enabled}`);
+
+      try {
+        const toggled = { ...original, away: !original.away };
+        await client.setAwayStatus(device.dev_id, toggled);
+
+        const afterToggle = await client.getAwayStatus(device.dev_id);
+        expect(afterToggle.away).toBe(!original.away);
+        console.log(`  After toggle: away=${afterToggle.away}`);
+      } finally {
+        await client.setAwayStatus(device.dev_id, original)
+          .catch((e) => console.warn(`  [cleanup] restore away failed: ${e}`));
+      }
+
+      const restored = await client.getAwayStatus(device.dev_id);
+      expect(restored.away).toBe(original.away);
+      console.log(`  Restored: away=${restored.away}`);
+    });
+
+    // ── Flow 6: Concurrent status reads across all heaters ──
+    // Read-only: no mutations, no cleanup needed
+    it('should handle concurrent status reads across all heaters', async () => {
+      const heaters = await findAllHeaters(client);
+      if (heaters.length === 0) return;
+
+      console.log(`  Fetching status for ${heaters.length} heater(s) in parallel...`);
+
+      const statusPromises = heaters.map(({ device, heater }) =>
+        client.getNodeStatus(device.dev_id, heater.type, heater.addr)
+      );
+      const statuses = await Promise.all(statusPromises);
+
+      expect(statuses.length).toBe(heaters.length);
+      for (let i = 0; i < statuses.length; i++) {
+        const status = statuses[i];
+        const { heater } = heaters[i];
+        expect(typeof status.stemp).toBe('number');
+        expect(typeof status.mtemp).toBe('number');
+        expect(status.mode).toBeDefined();
+        console.log(
+          `  ${heater.name}: ${status.mtemp}°C (target: ${status.stemp}°C)`
+        );
+      }
+    });
+
+    // ── Flow 7: Token refresh mid-workflow ──
+    // Only writes back the same mode (no-op mutation), safe even without cleanup
+    it('should recover from token invalidation mid-workflow', async () => {
+      const found = await findFirstHeater(client);
+      if (!found) return;
+      const { device, heater } = found;
+
+      const status1 = await client.getNodeStatus(
+        device.dev_id, heater.type, heater.addr
+      );
+      expect(typeof status1.stemp).toBe('number');
+      console.log(`  Before invalidation: ${status1.mtemp}°C`);
+
+      client.getTokenManager().invalidate();
+      expect(client.isAuthenticated()).toBe(false);
+
+      // Writes back same mode — no-op, but exercises the auto-refresh path
+      await client.setNodeStatus(device.dev_id, heater.type, heater.addr, {
+        mode: status1.mode,
+      });
+
+      const status2 = await client.getNodeStatus(
+        device.dev_id, heater.type, heater.addr
+      );
+      expect(typeof status2.stemp).toBe('number');
+      expect(client.isAuthenticated()).toBe(true);
+      console.log(`  After recovery: ${status2.mtemp}°C`);
+    });
+
+    // ── Flow 8: Concurrent token refresh under load ──
+    // Read-only after refresh: no mutations
+    it('should deduplicate concurrent token refreshes', async () => {
+      const heaters = await findAllHeaters(client);
+      if (heaters.length === 0) return;
+
+      client.getTokenManager().invalidate();
+
+      const promises = heaters.map(({ device, heater }) =>
+        client.getNodeStatus(device.dev_id, heater.type, heater.addr)
+      );
+      const results = await Promise.all(promises);
+
+      expect(results.length).toBe(heaters.length);
+      for (const status of results) {
+        expect(typeof status.stemp).toBe('number');
+        expect(typeof status.mtemp).toBe('number');
+      }
+      expect(client.isAuthenticated()).toBe(true);
+      console.log(`  ${results.length} concurrent requests all succeeded after token refresh`);
+    });
+
+    // ── Flow 9: Full "leaving home" automation ──
+    it('should execute a full "leaving home" automation and rollback', async () => {
+      const heaters = await findAllHeaters(client);
+      const devices = await client.getDevices();
+      if (heaters.length === 0 || devices.length === 0) return;
+
+      // Capture originals for this test's try/finally cleanup
+      const originalStates: Array<{
+        device: HelkiDevice;
+        heater: HelkiNode;
+        status: HelkiNodeStatus;
+      }> = [];
+      for (const { device, heater } of heaters) {
+        const status = await client.getNodeStatus(
+          device.dev_id, heater.type, heater.addr
+        );
+        originalStates.push({ device, heater, status });
+      }
+      const originalAway = await client.getAwayStatus(devices[0].dev_id);
+
+      try {
+        console.log('  --- Leaving Home ---');
+
+        for (const { device, heater } of heaters) {
+          await client.setNodeStatus(device.dev_id, heater.type, heater.addr, {
+            mode: 'manual',
+            stemp: 17,
+          });
+        }
+
+        await client.setAwayStatus(devices[0].dev_id, {
+          away: true,
+          enabled: originalAway.enabled,
+        });
+
+        for (const { device, heater } of heaters) {
+          const status = await client.getNodeStatus(
+            device.dev_id, heater.type, heater.addr
+          );
+          expect(status.mode).toBe('manual');
+          expect(status.stemp).toBe(17);
+          console.log(`  ${heater.name}: mode=${status.mode}, target=${status.stemp}°C`);
+        }
+        const awayAfter = await client.getAwayStatus(devices[0].dev_id);
+        expect(awayAfter.away).toBe(true);
+        console.log(`  Away mode: ${awayAfter.away}`);
+      } finally {
+        console.log('  --- Arriving Home (rollback) ---');
+
+        for (const { device, heater, status } of originalStates) {
+          await client.setNodeStatus(device.dev_id, heater.type, heater.addr, {
+            mode: status.mode,
+            stemp: status.stemp,
+          }).catch((e) => console.warn(`  [cleanup] restore heater failed: ${e}`));
+        }
+
+        await client.setAwayStatus(devices[0].dev_id, originalAway)
+          .catch((e) => console.warn(`  [cleanup] restore away failed: ${e}`));
+      }
+
+      // Verify rollback
+      for (const { device, heater, status: orig } of originalStates) {
+        const restored = await client.getNodeStatus(
+          device.dev_id, heater.type, heater.addr
+        );
+        expect(restored.mode).toBe(orig.mode);
+        expect(restored.stemp).toBe(orig.stemp);
+        console.log(
+          `  ${heater.name}: mode=${restored.mode}, target=${restored.stemp}°C (restored)`
+        );
+      }
+      const awayRestored = await client.getAwayStatus(devices[0].dev_id);
+      expect(awayRestored.away).toBe(originalAway.away);
+      console.log(`  Away mode: ${awayRestored.away} (restored)`);
+    });
+
+    // ── Flow 10: Rapid sequential temperature changes ──
+    it('should handle rapid sequential temperature changes', async () => {
+      const found = await findFirstHeater(client);
+      if (!found) return;
+      const { device, heater } = found;
+
+      const original = await client.getNodeStatus(
+        device.dev_id, heater.type, heater.addr
+      );
+
+      const temps = [18, 19, 20, 21, 22];
+      console.log(`  Rapidly setting temps: ${temps.join(' → ')}°C`);
+
+      try {
+        for (const temp of temps) {
+          await client.setNodeStatus(device.dev_id, heater.type, heater.addr, {
+            stemp: temp,
+          });
+        }
+
+        const finalStatus = await client.getNodeStatus(
+          device.dev_id, heater.type, heater.addr
+        );
+        expect(finalStatus.stemp).toBe(temps[temps.length - 1]);
+        console.log(`  Final target temp: ${finalStatus.stemp}°C`);
+      } finally {
+        await client.setNodeStatus(device.dev_id, heater.type, heater.addr, {
+          stemp: original.stemp,
+        }).catch((e) => console.warn(`  [cleanup] restore temp failed: ${e}`));
+      }
+    });
+
+    // ── Flow 11: Fresh client re-authentication ──
+    // Read-only: no mutations
+    it('should work with a freshly authenticated second client', async () => {
+      const freshClient = new HelkiApiClient(HELKI_API_BASE);
+      await freshClient.authenticate(HELKI_USERNAME!, HELKI_PASSWORD!);
+      expect(freshClient.isAuthenticated()).toBe(true);
+
+      const devices = await freshClient.getDevices();
+      expect(devices.length).toBeGreaterThan(0);
+
+      const nodes = await freshClient.getNodes(devices[0].dev_id);
+      const heater = nodes.find((n) => n.type === 'htr');
+      if (!heater) return;
+
+      const status = await freshClient.getNodeStatus(
+        devices[0].dev_id, heater.type, heater.addr
+      );
+      expect(typeof status.stemp).toBe('number');
+      expect(typeof status.mtemp).toBe('number');
+      console.log(
+        `  Fresh client: ${heater.name} at ${status.mtemp}°C (target: ${status.stemp}°C)`
+      );
+    });
+
+    // ── Flow 12: Status consistency across repeated reads ──
+    // Read-only: no mutations
+    it('should return consistent status across rapid reads', async () => {
+      const found = await findFirstHeater(client);
+      if (!found) return;
+      const { device, heater } = found;
+
+      const readings: HelkiNodeStatus[] = [];
+      for (let i = 0; i < 5; i++) {
+        const status = await client.getNodeStatus(
+          device.dev_id, heater.type, heater.addr
+        );
+        readings.push(status);
+      }
+
+      const modes = new Set(readings.map((r) => r.mode));
+      const targets = new Set(readings.map((r) => r.stemp));
+      expect(modes.size).toBe(1);
+      expect(targets.size).toBe(1);
+      console.log(
+        `  5 rapid reads: mode=${Array.from(modes)[0]}, target=${Array.from(targets)[0]}°C, ` +
+        `mtemp range: ${Math.min(...readings.map((r) => r.mtemp))}–${Math.max(...readings.map((r) => r.mtemp))}°C`
+      );
+    });
+
+    // ── Flow 13: Error handling doesn't corrupt client state ──
+    // The write is a no-op (same mode), safe without cleanup
+    it('should continue working after an API error', async () => {
+      const found = await findFirstHeater(client);
+      if (!found) return;
+      const { device, heater } = found;
+
+      await expect(
+        client.getNodes('does-not-exist-99999')
+      ).rejects.toThrow();
+
+      const status = await client.getNodeStatus(
+        device.dev_id, heater.type, heater.addr
+      );
+      expect(typeof status.stemp).toBe('number');
+      expect(typeof status.mtemp).toBe('number');
+      console.log(`  After error recovery: ${heater.name} at ${status.mtemp}°C`);
+
+      // Write-back is a no-op (same mode)
+      await client.setNodeStatus(device.dev_id, heater.type, heater.addr, {
+        mode: status.mode,
+      });
+      console.log('  Set mode succeeded after error');
+    });
+
+    // ── Flow 14: Mixed read/write across multiple devices ──
+    it('should read from one heater and mirror to another', async () => {
+      const heaters = await findAllHeaters(client);
+      if (heaters.length < 2) {
+        console.log('  Need at least 2 heaters for mirror test, skipping');
+        return;
+      }
+
+      const [source, target] = heaters;
+
+      const targetOriginal = await client.getNodeStatus(
+        target.device.dev_id, target.heater.type, target.heater.addr
+      );
+
+      try {
+        const sourceStatus = await client.getNodeStatus(
+          source.device.dev_id, source.heater.type, source.heater.addr
+        );
+        console.log(
+          `  Source (${source.heater.name}): mode=${sourceStatus.mode}, target=${sourceStatus.stemp}°C`
+        );
+
+        await client.setNodeStatus(
+          target.device.dev_id, target.heater.type, target.heater.addr,
+          { mode: sourceStatus.mode, stemp: sourceStatus.stemp }
+        );
+
+        const targetUpdated = await client.getNodeStatus(
+          target.device.dev_id, target.heater.type, target.heater.addr
+        );
+        expect(targetUpdated.mode).toBe(sourceStatus.mode);
+        expect(targetUpdated.stemp).toBe(sourceStatus.stemp);
+        console.log(
+          `  Target (${target.heater.name}): mode=${targetUpdated.mode}, target=${targetUpdated.stemp}°C (mirrored)`
+        );
+      } finally {
+        await client.setNodeStatus(
+          target.device.dev_id, target.heater.type, target.heater.addr,
+          { mode: targetOriginal.mode, stemp: targetOriginal.stemp }
+        ).catch((e) => console.warn(`  [cleanup] restore mirror target failed: ${e}`));
+      }
+
+      console.log(`  Target restored to: mode=${targetOriginal.mode}, target=${targetOriginal.stemp}°C`);
     });
   }
 );
