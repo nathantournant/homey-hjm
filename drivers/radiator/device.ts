@@ -1,6 +1,5 @@
 import Homey from 'homey';
 import { HelkiApiClient } from '../../lib/HelkiApiClient';
-import { HelkiSocketClient } from '../../lib/HelkiSocketClient';
 import {
   DeviceData,
   HelkiNodeStatus,
@@ -8,11 +7,20 @@ import {
   parseNodeStatus,
 } from '../../lib/types';
 
+// Optional: socket.io-client v2 may not be installed (SCFW blocks it)
+let HelkiSocketClient: typeof import('../../lib/HelkiSocketClient').HelkiSocketClient | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  HelkiSocketClient = require('../../lib/HelkiSocketClient').HelkiSocketClient;
+} catch {
+  // socket.io-client not available — polling-only mode
+}
+
 const POLL_INTERVAL_MS = 60000;
 
 class HJMRadiatorDevice extends Homey.Device {
   private api!: HelkiApiClient;
-  private socketClient: HelkiSocketClient | null = null;
+  private socketClient: InstanceType<typeof import('../../lib/HelkiSocketClient').HelkiSocketClient> | null = null;
   private pollInterval!: ReturnType<typeof setInterval>;
 
   async onInit(): Promise<void> {
@@ -58,6 +66,11 @@ class HJMRadiatorDevice extends Homey.Device {
   }
 
   private async connectSocket(): Promise<void> {
+    if (!HelkiSocketClient) {
+      this.log('Socket.io not available, using polling only');
+      return;
+    }
+
     const { deviceId } = this.getData() as DeviceData;
     const tokenManager = this.api.getTokenManager();
 
