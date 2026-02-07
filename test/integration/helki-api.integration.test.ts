@@ -673,6 +673,7 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
       try {
         console.log('  --- Leaving Home ---');
 
+        // Step 1: Lower heater temperatures
         for (let i = 0; i < heaters.length; i++) {
           const { device, heater } = heaters[i];
           await client.setNodeStatus(device.dev_id, heater.type, heater.addr, {
@@ -681,12 +682,7 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
           });
         }
 
-        await client.setAwayStatus(devices[0].dev_id, {
-          away: true,
-          enabled: originalAway.enabled,
-        });
-
-        // Wait for changes to propagate
+        // Step 2: Verify temps BEFORE toggling away (away mode may override stemp)
         for (let i = 0; i < heaters.length; i++) {
           const { device, heater } = heaters[i];
           const expectedTemp = leaveHomeTemps[i];
@@ -698,6 +694,13 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
           expect(status.stemp).toBe(expectedTemp);
           console.log(`  ${heater.name}: mode=${status.mode}, target=${status.stemp}°C`);
         }
+
+        // Step 3: Toggle away mode (may override stemp on the device)
+        await client.setAwayStatus(devices[0].dev_id, {
+          away: true,
+          enabled: originalAway.enabled,
+        });
+
         const awayAfter = await waitForAway(
           client, devices[0].dev_id, (a) => a.away === true
         );
@@ -706,20 +709,30 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
       } finally {
         console.log('  --- Arriving Home (rollback) ---');
 
+        // Restore away FIRST so it doesn't override the temp restore
+        await client.setAwayStatus(devices[0].dev_id, {
+          away: originalAway.away,
+          enabled: originalAway.enabled,
+        }).catch((e) => console.warn(`  [cleanup] restore away failed: ${e}`));
+
+        // Small delay to let away-mode release before restoring temps
+        await sleep(1500);
+
         for (const { device, heater, status } of originalStates) {
           await client.setNodeStatus(device.dev_id, heater.type, heater.addr, {
             mode: status.mode,
             stemp: status.stemp,
           }).catch((e) => console.warn(`  [cleanup] restore heater failed: ${e}`));
         }
-
-        await client.setAwayStatus(devices[0].dev_id, {
-          away: originalAway.away,
-          enabled: originalAway.enabled,
-        }).catch((e) => console.warn(`  [cleanup] restore away failed: ${e}`));
       }
 
-      // Verify rollback with polling
+      // Verify rollback with polling — check away first, then temps
+      const awayRestored = await waitForAway(
+        client, devices[0].dev_id, (a) => a.away === originalAway.away
+      );
+      expect(awayRestored.away).toBe(originalAway.away);
+      console.log(`  Away mode: ${awayRestored.away} (restored)`);
+
       for (const { device, heater, status: orig } of originalStates) {
         const restored = await waitForStatus(
           client, device.dev_id, heater.type, heater.addr,
@@ -731,11 +744,6 @@ describeIf(!!HELKI_USERNAME && !!HELKI_PASSWORD)(
           `  ${heater.name}: mode=${restored.mode}, target=${restored.stemp}°C (restored)`
         );
       }
-      const awayRestored = await waitForAway(
-        client, devices[0].dev_id, (a) => a.away === originalAway.away
-      );
-      expect(awayRestored.away).toBe(originalAway.away);
-      console.log(`  Away mode: ${awayRestored.away} (restored)`);
     }, INTEGRATION_TIMEOUT);
 
     // ── Flow 10: Rapid sequential temperature changes ──
