@@ -143,6 +143,10 @@ export class HelkiApiClient {
     if (status.active !== undefined) {
       apiStatus.active = status.active;
     }
+    // API requires units when any temperature field is present
+    if (apiStatus.stemp !== undefined || apiStatus.mtemp !== undefined) {
+      apiStatus.units = status.units ?? 'C';
+    }
     await this.client.post(
       `/api/v2/devs/${encodeURIComponent(deviceId)}/${encodeURIComponent(nodeType)}/${encodeURIComponent(String(nodeAddr))}/status`,
       apiStatus,

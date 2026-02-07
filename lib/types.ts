@@ -66,6 +66,7 @@ export interface HelkiNodeStatus {
   mtemp: number;
   mode: string;
   active: boolean;
+  units?: string;
   locked?: boolean;
   presence?: boolean;
   window_open?: boolean;
@@ -151,6 +152,9 @@ export function parseNodeStatus(raw: Partial<HelkiRawNodeStatus>): Partial<Helki
   }
   if (raw.boost !== undefined) {
     parsed.boost = raw.boost;
+  }
+  if (raw.units !== undefined) {
+    parsed.units = raw.units;
   }
 
   return parsed;

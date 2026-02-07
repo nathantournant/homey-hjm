@@ -128,7 +128,7 @@ describe('HelkiApiClient', () => {
   describe('setNodeStatus', () => {
     it('should convert numeric stemp (set/target) to string for API', async () => {
       nock(API_BASE)
-        .post('/api/v2/devs/smartbox-001/htr/1/status', { stemp: '23' })
+        .post('/api/v2/devs/smartbox-001/htr/1/status', { stemp: '23', units: 'C' })
         .matchHeader('Authorization', 'Bearer test-token')
         .reply(200);
 
@@ -139,7 +139,7 @@ describe('HelkiApiClient', () => {
 
     it('should convert numeric mtemp (measured) to string for API', async () => {
       nock(API_BASE)
-        .post('/api/v2/devs/smartbox-001/htr/1/status', { mtemp: '23' })
+        .post('/api/v2/devs/smartbox-001/htr/1/status', { mtemp: '23', units: 'C' })
         .matchHeader('Authorization', 'Bearer test-token')
         .reply(200);
 
@@ -174,6 +174,7 @@ describe('HelkiApiClient', () => {
           stemp: '22.5',
           mode: 'auto',
           active: false,
+          units: 'C',
         })
         .reply(200);
 

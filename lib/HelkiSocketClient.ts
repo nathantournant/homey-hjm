@@ -1,7 +1,10 @@
-import { io, Socket } from 'socket.io-client';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+import io = require('socket.io-client');
 import { EventEmitter } from 'events';
 import { HelkiTokenManager } from './HelkiTokenManager';
 import { HelkiSocketUpdate } from './types';
+
+type Socket = ReturnType<typeof io>;
 
 const PING_INTERVAL_MS = 20000;
 const RECONNECT_DELAY_MS = 5000;

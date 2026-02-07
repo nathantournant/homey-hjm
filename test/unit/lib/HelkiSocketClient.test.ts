@@ -1,22 +1,21 @@
 import { HelkiSocketClient } from '../../../lib/HelkiSocketClient';
 import { HelkiTokenManager } from '../../../lib/HelkiTokenManager';
 
-// Mock socket.io-client
+// Mock socket.io-client (v2 uses module.exports = io)
 jest.mock('socket.io-client', () => {
-  const mockSocket = {
+  const socket = {
     on: jest.fn(),
     emit: jest.fn(),
     disconnect: jest.fn(),
     removeAllListeners: jest.fn(),
     connected: false,
   };
-  return {
-    io: jest.fn(() => mockSocket),
-    __mockSocket: mockSocket,
-  };
+  const io = Object.assign(jest.fn(() => socket), { __mockSocket: socket });
+  return io;
 });
 
-const { __mockSocket: mockSocket } = jest.requireMock('socket.io-client');
+const mockIo = jest.requireMock('socket.io-client') as jest.Mock & { __mockSocket: any };
+const mockSocket = mockIo.__mockSocket;
 
 describe('HelkiSocketClient', () => {
   let client: HelkiSocketClient;
@@ -42,7 +41,7 @@ describe('HelkiSocketClient', () => {
 
   describe('connect', () => {
     it('should create socket connection with correct params', async () => {
-      const { io } = jest.requireMock('socket.io-client');
+      const io = mockIo;
       await client.connect();
 
       expect(io).toHaveBeenCalledWith('https://api-hjm.helki.com', {
@@ -87,7 +86,7 @@ describe('HelkiSocketClient', () => {
     });
 
     it('should return early if destroyed', async () => {
-      const { io } = jest.requireMock('socket.io-client');
+      const io = mockIo;
       client.disconnect(); // sets destroyed = true
       io.mockClear();
 
@@ -230,7 +229,7 @@ describe('HelkiSocketClient', () => {
       disconnectHandler?.('test');
 
       // Verify the reconnect timer is set by advancing time
-      const { io } = jest.requireMock('socket.io-client');
+      const io = mockIo;
       io.mockClear();
 
       // Not enough time
@@ -268,7 +267,7 @@ describe('HelkiSocketClient', () => {
       }
 
       // Now on attempt 4, delay should be capped at 60s
-      const { io } = jest.requireMock('socket.io-client');
+      const io = mockIo;
       io.mockClear();
       disconnectHandler?.('test');
 
